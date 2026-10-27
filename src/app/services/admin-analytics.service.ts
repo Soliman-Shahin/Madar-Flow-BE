@@ -1,10 +1,15 @@
 import { PipelineStage } from 'mongoose';
+import { PlanSlug } from '../types/plan.types';
 import { User } from '../models/user.model';
 import { Expense } from '../models/expense.model';
 import { SyncConflict, SyncOperation } from '../models/sync.model';
 
 export type AnalyticsDays = 7 | 30 | 90;
 export type AnalyticsKind = 'newUsers' | 'recordingUsers' | 'expenses';
+export interface AnalyticsFilters {
+  plan?: string;
+  type?: 'income' | 'outcome';
+}
 const DAY = 86_400_000;
 // A retained consumer account may be disabled. Disabled is not deleted.
 const consumers = { role: 'user', _isDeleted: { $ne: true } };
@@ -27,6 +32,52 @@ const ownerScope: PipelineStage[] = [
   },
   { $match: { 'owner.0': { $exists: true } } },
 ];
+
+function consumerScope(filters: AnalyticsFilters) {
+  return {
+    ...consumers,
+    ...(filters.plan ? { plan: filters.plan as PlanSlug } : {}),
+  };
+}
+
+function filteredOwnerScope(filters: AnalyticsFilters): PipelineStage[] {
+  if (!filters.plan) return ownerScope;
+  return [
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'user',
+        foreignField: '_id',
+        pipeline: [
+          { $match: consumerScope(filters) },
+          { $project: { _id: 1, fullName: 1, username: 1, email: 1 } },
+        ],
+        as: 'owner',
+      },
+    },
+    { $match: { 'owner.0': { $exists: true } } },
+  ];
+}
+
+function recordTypeScope(filters: AnalyticsFilters): PipelineStage[] {
+  if (!filters.type) return [];
+  return [
+    {
+      $lookup: {
+        from: 'categories',
+        localField: 'category',
+        foreignField: '_id',
+        pipeline: [
+          { $match: { type: filters.type } },
+          { $project: { _id: 1 } },
+        ],
+        as: 'matchingCategory',
+      },
+    },
+    { $match: { 'matchingCategory.0': { $exists: true } } },
+    { $unset: 'matchingCategory' },
+  ];
+}
 
 export function analyticsPeriod(days: AnalyticsDays, now = new Date()) {
   const end = new Date(
@@ -70,7 +121,11 @@ function recordingCount(
 }
 
 export class AdminAnalyticsService {
-  async overview(days: AnalyticsDays, now = new Date()) {
+  async overview(
+    days: AnalyticsDays,
+    now = new Date(),
+    filters: AnalyticsFilters = {}
+  ) {
     const { start, end, previousStart } = analyticsPeriod(days, now);
     const [
       userDays,
@@ -82,7 +137,7 @@ export class AdminAnalyticsService {
       User.aggregate([
         {
           $match: {
-            ...consumers,
+            ...consumerScope(filters),
             createdAt: { $gte: previousStart, $lt: end },
           },
         },
@@ -90,7 +145,8 @@ export class AdminAnalyticsService {
       ]),
       Expense.aggregate([
         { $match: { ...live, createdAt: { $gte: previousStart, $lt: end } } },
-        ...ownerScope,
+        ...filteredOwnerScope(filters),
+        ...recordTypeScope(filters),
         {
           $facet: {
             daily: [
@@ -139,7 +195,7 @@ export class AdminAnalyticsService {
           },
         },
       ]),
-      User.countDocuments(consumers),
+      User.countDocuments(consumerScope(filters)),
       SyncConflict.aggregate([
         { $match: { resolvedAt: null } },
         ...ownerScope,
@@ -224,6 +280,7 @@ export class AdminAnalyticsService {
         generatedAt: now.toISOString(),
       },
       scope: 'retained-consumer-accounts',
+      filters: { plan: filters.plan || null, type: filters.type || null },
       totalUsers,
       metrics: {
         newUsers: compareMetric(
@@ -258,7 +315,8 @@ export class AdminAnalyticsService {
     day: string | undefined,
     page: number,
     now = new Date(),
-    asOf?: string
+    asOf?: string,
+    filters: AnalyticsFilters = {}
   ) {
     // Anchor drill-downs to the overview even if UTC midnight passes between requests.
     const anchor = asOf ? new Date(`${asOf}T00:00:00.000Z`) : now;
@@ -286,7 +344,7 @@ export class AdminAnalyticsService {
     let pipeline: PipelineStage[];
     if (kind === 'newUsers') {
       pipeline = [
-        { $match: { ...consumers, createdAt: dates } },
+        { $match: { ...consumerScope(filters), createdAt: dates } },
         {
           $project: {
             title: {
@@ -298,7 +356,11 @@ export class AdminAnalyticsService {
         },
       ];
     } else {
-      pipeline = [{ $match: { ...live, createdAt: dates } }, ...ownerScope];
+      pipeline = [
+        { $match: { ...live, createdAt: dates } },
+        ...filteredOwnerScope(filters),
+        ...recordTypeScope(filters),
+      ];
       if (kind === 'recordingUsers') {
         pipeline.push(
           {
@@ -354,6 +416,7 @@ export class AdminAnalyticsService {
       limit: 10,
       start: start.toISOString(),
       endExclusive: end.toISOString(),
+      filters: { plan: filters.plan || null, type: filters.type || null },
     };
   }
 }

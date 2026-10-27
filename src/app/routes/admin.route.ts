@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { adminController } from '../controllers/admin.controller';
 import { planController } from '../controllers/plan.controller';
 import { verifyAccessToken } from '../middleware/access.middleware';
@@ -16,10 +16,26 @@ const router = Router();
 router.use(verifyAccessToken);
 
 // ==================== DASHBOARD STATS (Moderator+) ====================
-router.get('/analytics', requireModerator, adminAnalyticsController.overview);
+// Plan assignments already require Admin. Filtering must not bypass that boundary.
+const requireAnalyticsPlanAccess = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) =>
+  Object.prototype.hasOwnProperty.call(req.query, 'plan')
+    ? requireAdmin(req, res, next)
+    : next();
+
+router.get(
+  '/analytics',
+  requireModerator,
+  requireAnalyticsPlanAccess,
+  adminAnalyticsController.overview
+);
 router.get(
   '/analytics/records',
   requireModerator,
+  requireAnalyticsPlanAccess,
   adminAnalyticsController.records
 );
 router.get(

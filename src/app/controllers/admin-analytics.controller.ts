@@ -7,7 +7,14 @@ import {
 } from '../services/admin-analytics.service';
 
 const periodQuery = z
-  .object({ days: z.enum(['7', '30', '90']).default('30') })
+  .object({
+    days: z.enum(['7', '30', '90']).default('30'),
+    plan: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+      .optional(),
+    type: z.enum(['income', 'outcome']).optional(),
+  })
   .strict();
 const recordsQuery = periodQuery.extend({
   asOf: z
@@ -39,7 +46,9 @@ export const adminAnalyticsController = {
       return sendSuccess(
         res,
         await adminAnalyticsService.overview(
-          Number(query.data.days) as AnalyticsDays
+          Number(query.data.days) as AnalyticsDays,
+          undefined,
+          { plan: query.data.plan, type: query.data.type }
         ),
         'Analytics retrieved successfully'
       );
@@ -57,7 +66,7 @@ export const adminAnalyticsController = {
         'INVALID_ANALYTICS_QUERY'
       );
     try {
-      const { kind, days, day, page, asOf } = query.data;
+      const { kind, days, day, page, asOf, plan, type } = query.data;
       return sendSuccess(
         res,
         await adminAnalyticsService.records(
@@ -66,7 +75,8 @@ export const adminAnalyticsController = {
           day,
           Number(page),
           undefined,
-          asOf
+          asOf,
+          { plan, type }
         ),
         'Analytics records retrieved successfully'
       );
