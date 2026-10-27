@@ -1,4 +1,8 @@
 import { Schema, model, Document, Types } from 'mongoose';
+import {
+  CLIENT_ID_INDEX_KEYS,
+  CLIENT_ID_INDEX_OPTIONS,
+} from './client-id-index';
 
 export interface IExpense extends Document {
   description: string;
@@ -47,7 +51,7 @@ expenseSchema.index({ user: 1, _lastModified: -1 });
 expenseSchema.index({ user: 1, _syncStatus: 1 });
 // Client identities are the durable idempotency key for offline CREATE retries.
 // Scope it by owner so two accounts can legitimately use the same local key.
-expenseSchema.index({ user: 1, _clientId: 1 }, { unique: true, sparse: true });
+expenseSchema.index(CLIENT_ID_INDEX_KEYS, CLIENT_ID_INDEX_OPTIONS);
 
 const Expense = model<IExpense>('Expense', expenseSchema);
 export { Expense };

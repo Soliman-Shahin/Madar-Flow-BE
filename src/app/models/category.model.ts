@@ -1,5 +1,9 @@
 import { Schema, model, Document, Types } from 'mongoose';
 import { Expense } from './expense.model';
+import {
+  CLIENT_ID_INDEX_KEYS,
+  CLIENT_ID_INDEX_OPTIONS,
+} from './client-id-index';
 
 export interface ICategory extends Document {
   title: string;
@@ -90,7 +94,7 @@ categorySchema.pre(
 categorySchema.index({ user: 1, _lastModified: -1 });
 categorySchema.index({ user: 1, _syncStatus: 1 });
 // Client identities are the durable idempotency key for offline CREATE retries.
-categorySchema.index({ user: 1, _clientId: 1 }, { unique: true, sparse: true });
+categorySchema.index(CLIENT_ID_INDEX_KEYS, CLIENT_ID_INDEX_OPTIONS);
 // Index for filtering by user and type (income/outcome)
 categorySchema.index({ user: 1, type: 1 });
 // Index for ordering categories
