@@ -494,6 +494,7 @@ export class PlanService {
 
   async getPlanDistribution() {
     const distribution = await User.aggregate([
+      { $match: { role: 'user', _isDeleted: { $ne: true } } },
       {
         $group: {
           _id: '$plan',

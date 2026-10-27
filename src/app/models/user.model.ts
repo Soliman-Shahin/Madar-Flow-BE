@@ -247,6 +247,7 @@ UserSchema.index({ plan: 1 });
 UserSchema.index({ planExpiresAt: 1 }, { sparse: true });
 // Index for role-based queries
 UserSchema.index({ role: 1 });
+UserSchema.index({ role: 1, createdAt: -1 });
 
 // *** Instance methods ***
 UserSchema.methods.toJSON = function () {

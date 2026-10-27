@@ -1,4 +1,10 @@
-import { User, UserRole, canManageTargetRole, canAssignRole, UserDocument } from '../models/user.model';
+import {
+  User,
+  UserRole,
+  canManageTargetRole,
+  canAssignRole,
+  UserDocument,
+} from '../models/user.model';
 import { Expense } from '../models/expense.model';
 import { Category } from '../models/category.model';
 import logger from './logger.service';
@@ -26,7 +32,11 @@ export class AdminService {
     actorEmail?: string;
     actorRole?: UserRole;
     action: AuditAction;
-    notification: { title: string; message: string; type: 'info' | 'success' | 'warn' | 'error' };
+    notification: {
+      title: string;
+      message: string;
+      type: 'info' | 'success' | 'warn' | 'error';
+    };
     changes?: Record<string, any>;
     targetUserId?: string;
     targetResourceType?: string;
@@ -44,7 +54,7 @@ export class AdminService {
         targetUserId: params.targetUserId,
         targetResourceType: params.targetResourceType,
         targetResourceId: params.targetResourceId,
-        changes: params.changes
+        changes: params.changes,
       });
       auditLogId = auditLog._id.toString();
     } catch (err) {
@@ -58,13 +68,24 @@ export class AdminService {
         message: params.notification.message,
         type: params.notification.type,
         action: params.action,
-        actor: { id: params.actorId, email: params.actorEmail, role: params.actorRole },
-        resource: { type: params.targetResourceType, id: params.targetResourceId, name: params.targetResourceType },
+        actor: {
+          id: params.actorId,
+          email: params.actorEmail,
+          role: params.actorRole,
+        },
+        resource: {
+          type: params.targetResourceType,
+          id: params.targetResourceId,
+          name: params.targetResourceType,
+        },
         changes: params.changes,
-        auditLogId: auditLogId
+        auditLogId: auditLogId,
       });
     } catch (err) {
-      logger.error('Failed to broadcast socket notification in notifyAndAudit', err as Error);
+      logger.error(
+        'Failed to broadcast socket notification in notifyAndAudit',
+        err as Error
+      );
     }
   }
 
@@ -91,22 +112,6 @@ export class AdminService {
         totalExpenses,
         totalCategories,
         recentExpenses,
-        trends: {
-          users: 12, // Mocked for now: +12% increase this month
-          expenses: 8, // +8% increase this month
-          categories: -5, // -5% decrease
-        },
-        charts: {
-          revenue: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-            expensesData: [65, 59, 80, 81, 56, 55, 90],
-            incomeData: [28, 48, 40, 19, 86, 27, 90],
-          },
-          categoryBreakdown: {
-            labels: ['Food', 'Transport', 'Utilities'],
-            data: [300, 50, 100],
-          },
-        },
       };
     } catch (error) {
       logger.error('Error fetching system stats:', error as Error);
@@ -206,7 +211,12 @@ export class AdminService {
    * Update user details (e.g., role, plan, permissions)
    * Note: For plan assignment with subscription tracking, use planService.assignPlan()
    */
-  async updateUser(actorRole: UserRole, userId: string, updateData: Partial<UserDocument>, req?: Request) {
+  async updateUser(
+    actorRole: UserRole,
+    userId: string,
+    updateData: Partial<UserDocument>,
+    req?: Request
+  ) {
     try {
       const userToUpdate = await User.findById(userId);
       if (!userToUpdate) throw new Error('User not found');
@@ -215,8 +225,13 @@ export class AdminService {
         throw new Error('You do not have permission to modify this user');
       }
 
-      if (updateData.role && !canAssignRole(actorRole, updateData.role as UserRole)) {
-        throw new Error(`You do not have permission to assign the role: ${updateData.role}`);
+      if (
+        updateData.role &&
+        !canAssignRole(actorRole, updateData.role as UserRole)
+      ) {
+        throw new Error(
+          `You do not have permission to assign the role: ${updateData.role}`
+        );
       }
 
       const ALLOWED_FIELDS = [
@@ -241,12 +256,12 @@ export class AdminService {
 
       Object.assign(userToUpdate, safeUpdate);
       await userToUpdate.save();
-      
+
       if (safeUpdate.role || safeUpdate.plan || safeUpdate.customPermissions) {
         permissionCacheService.invalidateUser(userId);
         logger.debug(`Invalidated permission cache for user ${userId}`);
       }
-      
+
       await this.notifyAndAudit({
         req,
         actorRole,
@@ -254,12 +269,12 @@ export class AdminService {
         notification: {
           title: 'User Updated',
           message: `User ${userToUpdate.email} has been updated.`,
-          type: 'info'
+          type: 'info',
         },
         changes: safeUpdate,
         targetUserId: userToUpdate._id.toString(),
         targetResourceType: 'User',
-        targetResourceId: userToUpdate._id.toString()
+        targetResourceId: userToUpdate._id.toString(),
       });
 
       return userToUpdate.toObject();
@@ -297,11 +312,11 @@ export class AdminService {
         notification: {
           title: 'User Deleted',
           message: `User ${user.email} was deleted.`,
-          type: 'warn'
+          type: 'warn',
         },
         targetUserId: user._id.toString(),
         targetResourceType: 'User',
-        targetResourceId: user._id.toString()
+        targetResourceId: user._id.toString(),
       });
 
       return user;
@@ -339,11 +354,11 @@ export class AdminService {
         notification: {
           title: 'User Restored',
           message: `User ${user.email} was restored.`,
-          type: 'success'
+          type: 'success',
         },
         targetUserId: user._id.toString(),
         targetResourceType: 'User',
-        targetResourceId: user._id.toString()
+        targetResourceId: user._id.toString(),
       });
 
       return user;
@@ -356,10 +371,16 @@ export class AdminService {
   /**
    * Create a new user (Admin action)
    */
-  async createUser(actorRole: UserRole, data: Partial<UserDocument>, req?: Request) {
+  async createUser(
+    actorRole: UserRole,
+    data: Partial<UserDocument>,
+    req?: Request
+  ) {
     try {
       if (data.role && !canAssignRole(actorRole, data.role as UserRole)) {
-        throw new Error(`You do not have permission to create a user with role: ${data.role}`);
+        throw new Error(
+          `You do not have permission to create a user with role: ${data.role}`
+        );
       }
 
       const existingUser = await UserService.findByEmail((data as any).email);
@@ -391,12 +412,12 @@ export class AdminService {
         notification: {
           title: 'New User Created',
           message: `User ${newUser.email} joined.`,
-          type: 'success'
+          type: 'success',
         },
         changes: data,
         targetUserId: newUser._id.toString(),
         targetResourceType: 'User',
-        targetResourceId: newUser._id.toString()
+        targetResourceId: newUser._id.toString(),
       });
 
       return userObj;
@@ -528,11 +549,11 @@ export class AdminService {
         notification: {
           title: 'Category Updated',
           message: `Category '${category.title}' was updated.`,
-          type: 'info'
+          type: 'info',
         },
         changes: safeUpdate,
         targetResourceType: 'Category',
-        targetResourceId: category._id.toString()
+        targetResourceId: category._id.toString(),
       });
 
       return category;
@@ -568,10 +589,10 @@ export class AdminService {
         notification: {
           title: 'Category Deleted',
           message: `Category '${category.title}' was deleted.`,
-          type: 'warn'
+          type: 'warn',
         },
         targetResourceType: 'Category',
-        targetResourceId: category._id.toString()
+        targetResourceId: category._id.toString(),
       });
 
       return category;
@@ -603,10 +624,10 @@ export class AdminService {
         notification: {
           title: 'Category Restored',
           message: `Category '${category.title}' was restored.`,
-          type: 'success'
+          type: 'success',
         },
         targetResourceType: 'Category',
-        targetResourceId: category._id.toString()
+        targetResourceId: category._id.toString(),
       });
 
       return category;
@@ -637,18 +658,18 @@ export class AdminService {
         isDefault: true,
       });
       await category.save();
-      
+
       await this.notifyAndAudit({
         req,
         action: AuditAction.CATEGORY_CREATED,
         notification: {
           title: 'New Category',
           message: `Category '${category.title}' was created.`,
-          type: 'success'
+          type: 'success',
         },
         changes: data,
         targetResourceType: 'Category',
-        targetResourceId: category._id.toString()
+        targetResourceId: category._id.toString(),
       });
 
       return category;
@@ -677,7 +698,9 @@ export class AdminService {
 
       const descriptionPattern = safeSearchPattern(search);
       if (descriptionPattern) {
-        query.$or = [{ description: { $regex: descriptionPattern, $options: 'i' } }];
+        query.$or = [
+          { description: { $regex: descriptionPattern, $options: 'i' } },
+        ];
       }
 
       const skip = (page - 1) * limit;
@@ -743,10 +766,10 @@ export class AdminService {
         notification: {
           title: 'Expense Deleted',
           message: `An expense of ${expense.amount} was deleted.`,
-          type: 'warn'
+          type: 'warn',
         },
         targetResourceType: 'Expense',
-        targetResourceId: expense._id.toString()
+        targetResourceId: expense._id.toString(),
       });
 
       return expense;
@@ -773,10 +796,10 @@ export class AdminService {
         notification: {
           title: 'Expense Restored',
           message: `An expense of ${expense.amount} was restored.`,
-          type: 'success'
+          type: 'success',
         },
         targetResourceType: 'Expense',
-        targetResourceId: expense._id.toString()
+        targetResourceId: expense._id.toString(),
       });
 
       return expense;
