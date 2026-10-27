@@ -6,6 +6,7 @@ import { permissionCacheService } from './permission-cache.service';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { ConflictError } from '../shared/errors';
+import { UserService } from './user.service';
 import { getSocketService } from './socket.service';
 import { Request } from 'express';
 import { auditLogService } from './audit-log.service';
@@ -359,7 +360,7 @@ export class AdminService {
         throw new Error(`You do not have permission to create a user with role: ${data.role}`);
       }
 
-      const existingUser = await User.findOne({ email: (data as any).email });
+      const existingUser = await UserService.findByEmail((data as any).email);
       if (existingUser) {
         throw new ConflictError('User with this email already exists');
       }
