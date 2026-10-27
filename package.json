@@ -13,7 +13,8 @@
     "seed:plans": "ts-node src/app/scripts/seed-plans.ts",
     "seed:admin": "ts-node src/app/scripts/seed-admin.ts",
     "seed:roles": "ts-node src/app/scripts/seed-roles.ts",
-    "migrate:emails": "ts-node src/app/scripts/normalize-emails.ts"
+    "migrate:emails": "ts-node src/app/scripts/normalize-emails.ts",
+    "migrate:clientid-indexes": "ts-node src/app/scripts/migrate-clientid-indexes.ts"
   },
   "author": "Orbit Madar",
   "license": "ISC",
