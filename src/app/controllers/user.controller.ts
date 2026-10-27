@@ -21,6 +21,10 @@ import { BiometricCredentialService } from '../services/biometric-credential.ser
 import { auditLogService } from '../services/audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import {
+  AccountDeletionError,
+  AccountDeletionService,
+} from '../services/account-deletion.service';
+import {
   UserCredentials,
   UserUpdatePayload,
   UserResponse,
@@ -473,3 +477,24 @@ const uploadAvatar = async (
 };
 
 export { uploadAvatar };
+
+const deleteMe = async (req: CustomRequest, res: Response) => {
+  const userId = req.user_id;
+  if (!userId) return sendError(res, 'Unauthorized', 401);
+  try {
+    await AccountDeletionService.deleteOwnAccount({
+      userId,
+      password: req.body?.password,
+      confirmation: req.body?.confirmation,
+      ipAddress: req.ip,
+    });
+    return sendSuccess(res, {}, 'Account deleted');
+  } catch (error: unknown) {
+    if (error instanceof AccountDeletionError)
+      return sendError(res, error.message, error.statusCode, error.code);
+    logger.error('Account deletion failed');
+    return sendError(res, 'Account deletion failed', 500);
+  }
+};
+
+export { deleteMe };

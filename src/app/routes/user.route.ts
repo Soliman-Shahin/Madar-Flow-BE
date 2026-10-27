@@ -13,6 +13,7 @@ import {
   logout,
   getMe,
   updateMe,
+  deleteMe,
   uploadAvatar,
   requestPasswordReset,
   resetPassword,
@@ -419,6 +420,15 @@ router.put(
   '/me',
   verifyAccessToken as unknown as RequestHandler,
   updateMe as unknown as RequestHandler
+);
+
+// Permanent self-service account deletion (Google Play requirement).
+// POST rather than DELETE so the request body survives proxies.
+router.post(
+  '/me/delete',
+  strictAuthRateLimiter,
+  verifyAccessToken as unknown as RequestHandler,
+  deleteMe as unknown as RequestHandler
 );
 
 // Avatar upload

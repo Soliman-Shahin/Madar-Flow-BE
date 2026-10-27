@@ -130,6 +130,8 @@ interface UserDocument extends Document {
   passwordResetTokenHash?: string;
   passwordResetExpiresAt?: Date;
   passwordResetRequestedAt?: Date;
+  accountDeletionTokenHash?: string;
+  accountDeletionExpiresAt?: Date;
   isActive?: boolean;
   _isDeleted?: boolean;
   // ── Subscription / Plan ────────────────────────────────────────────────────
@@ -210,6 +212,8 @@ const UserSchema = new Schema<UserDocument>(
     passwordResetTokenHash: { type: String, select: false },
     passwordResetExpiresAt: { type: Date, select: false },
     passwordResetRequestedAt: { type: Date, select: false },
+    accountDeletionTokenHash: { type: String, select: false },
+    accountDeletionExpiresAt: { type: Date, select: false },
     isActive: { type: Boolean, default: true },
     _isDeleted: { type: Boolean, default: false },
     // ── Subscription / Plan Fields ─────────────────────────────────────────
