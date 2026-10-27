@@ -59,13 +59,8 @@ const signUp = async (req: CustomRequest, res: Response) => {
       });
     }
 
-    // Check if user exists
-    const existingUser = await UserService.validateUserCredentials(
-      email,
-      password
-    ).catch(() => null);
-
-    if (existingUser) {
+    // Check if the e-mail is taken, whatever password was supplied.
+    if (await User.exists({ email })) {
       throw new ConflictError('Email already used');
     }
 
@@ -109,6 +104,9 @@ const signUp = async (req: CustomRequest, res: Response) => {
     };
     const err = error as ErrorWithContext;
     logger.error('Signup failed', undefined, context);
+    // A concurrent signup can still hit the unique index; never leak it.
+    if ((error as any)?.code === 11000)
+      return sendError(res, 'Email already used', 409, 'CONFLICT');
     sendError(
       res,
       err.message || 'Signup failed',
@@ -292,8 +290,11 @@ const requestPasswordReset = async (req: CustomRequest, res: Response) => {
 const resetPassword = async (req: CustomRequest, res: Response) => {
   try {
     const { token, password } = req.body || {};
-    const validation = validatePassword(password);
-    if (typeof token !== 'string' || !validation.isValid)
+    if (
+      typeof token !== 'string' ||
+      typeof password !== 'string' ||
+      !validatePassword(password).isValid
+    )
       return sendError(
         res,
         'Invalid or expired reset link',

@@ -15,7 +15,9 @@ async function createFixture() {
     email: `sync-http-${Date.now()}@example.test`,
     password: 'not-used',
   });
-  const token = await user.generateAccessAuthToken();
+  // Access tokens are bound to a persisted session (sid), so create one first.
+  await user.createSession();
+  const token = await (await User.findById(user._id))!.generateAccessAuthToken();
   const category = await Category.create({
     user: user._id,
     _clientId: `sync-http-category-${Date.now()}`,
