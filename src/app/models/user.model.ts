@@ -170,7 +170,6 @@ const UserSchema = new Schema<UserDocument>(
       minlength: 1,
       trim: true,
       // Stored lowercase so the unique index is effectively case-insensitive.
-      // Existing mixed-case rows: see scripts/normalize-emails.ts.
       lowercase: true,
       unique: true,
     },

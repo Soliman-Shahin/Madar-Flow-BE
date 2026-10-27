@@ -60,8 +60,7 @@ export class UserService {
 
   /**
    * Finds a user by e-mail. Stored e-mails are lowercase (schema
-   * `lowercase: true`; legacy rows are fixed by `npm run migrate:emails`), so
-   * the normalized address is an exact, indexed match.
+   * `lowercase: true`), so the normalized address is an exact, indexed match.
    */
   static async findByEmail(
     rawEmail: unknown,
