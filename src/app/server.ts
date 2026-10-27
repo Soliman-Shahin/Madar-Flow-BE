@@ -11,6 +11,8 @@ import { validateEncryptionKey } from './config/encryption-config';
 import { subscriptionExpiryReminderJob } from './jobs/subscription-expiry-reminder.job';
 import { notificationArchivalJob } from './jobs/notification-archival.job';
 import { sessionCleanupJob } from './jobs/session-cleanup.job';
+import { permissionExpiryJob } from './jobs/permission-expiry.job';
+import { auditLogRetentionJob } from './jobs/audit-log-retention.job';
 
 const DEFAULT_PORT = 3000;
 
@@ -66,6 +68,8 @@ function registerGracefulShutdown(closeServer: () => Promise<void>): void {
       subscriptionExpiryReminderJob.stop();
       notificationArchivalJob.stop();
       sessionCleanupJob.stop();
+      permissionExpiryJob.stop();
+      auditLogRetentionJob.stop();
       await closeServer();
       await mongoose.connection.close();
       logger.info('[server]: Shutdown complete');
@@ -106,6 +110,8 @@ async function startServer() {
       subscriptionExpiryReminderJob.start();
       notificationArchivalJob.start();
       sessionCleanupJob.start();
+      permissionExpiryJob.start();
+      auditLogRetentionJob.start();
     });
 
     registerGracefulShutdown(() => socketService.close());
