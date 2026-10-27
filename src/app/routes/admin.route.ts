@@ -8,6 +8,7 @@ import {
   requireSuperAdmin,
 } from '../middleware/admin.middleware';
 import { UserRole } from '../models/user.model';
+import { adminAnalyticsController } from '../controllers/admin-analytics.controller';
 
 const router = Router();
 
@@ -15,6 +16,12 @@ const router = Router();
 router.use(verifyAccessToken);
 
 // ==================== DASHBOARD STATS (Moderator+) ====================
+router.get('/analytics', requireModerator, adminAnalyticsController.overview);
+router.get(
+  '/analytics/records',
+  requireModerator,
+  adminAnalyticsController.records
+);
 router.get(
   '/stats',
   requireModerator,

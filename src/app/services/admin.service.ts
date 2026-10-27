@@ -91,22 +91,6 @@ export class AdminService {
         totalExpenses,
         totalCategories,
         recentExpenses,
-        trends: {
-          users: 12, // Mocked for now: +12% increase this month
-          expenses: 8, // +8% increase this month
-          categories: -5, // -5% decrease
-        },
-        charts: {
-          revenue: {
-            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'],
-            expensesData: [65, 59, 80, 81, 56, 55, 90],
-            incomeData: [28, 48, 40, 19, 86, 27, 90],
-          },
-          categoryBreakdown: {
-            labels: ['Food', 'Transport', 'Utilities'],
-            data: [300, 50, 100],
-          },
-        },
       };
     } catch (error) {
       logger.error('Error fetching system stats:', error as Error);

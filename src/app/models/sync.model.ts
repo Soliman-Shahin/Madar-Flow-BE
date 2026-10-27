@@ -138,6 +138,7 @@ const syncMetadataSchema = new Schema(
 // Indexes for sync operations
 syncOperationSchema.index({ user: 1, status: 1 });
 syncOperationSchema.index({ user: 1, timestamp: -1 });
+syncOperationSchema.index({ status: 1, user: 1 });
 
 conflictResolutionSchema.index({ user: 1, timestamp: -1 });
 conflictResolutionSchema.index({ entityId: 1, entityType: 1 });
@@ -146,6 +147,7 @@ conflictResolutionSchema.index(
   { unique: true, sparse: true }
 );
 syncConflictSchema.index({ user: 1, resolvedAt: 1, detectedAt: -1 });
+syncConflictSchema.index({ resolvedAt: 1, detectedAt: -1 });
 
 export const SyncOperation = model<ISyncOperation>(
   'SyncOperation',
