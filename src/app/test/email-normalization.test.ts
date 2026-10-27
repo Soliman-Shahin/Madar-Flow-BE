@@ -80,37 +80,42 @@ describe('new accounts', () => {
   });
 });
 
-describe('legacy mixed-case accounts (before the migration runs)', () => {
+describe('legacy mixed-case accounts', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('can still log in, in any case', async () => {
-    await legacyUser('Ahmed@Gmail.com');
+  /** A pre-normalization account after `npm run migrate:emails -- --apply`. */
+  async function migratedLegacyUser(email: string) {
+    const id = await legacyUser(email);
+    await normalizeStoredEmails(true);
+    return id;
+  }
+
+  it('are not matched until migrated (the migration is required)', async () => {
+    await legacyUser('Unmigrated@Example.Test');
+    expect(await UserService.findByEmail('unmigrated@example.test')).toBeNull();
+  });
+
+  it('log in with any case once migrated', async () => {
+    await migratedLegacyUser('Ahmed@Gmail.com');
     expect((await post('/login', { email: 'ahmed@gmail.com', password: PASSWORD })).status).toBe(200);
     expect((await post('/login', { email: 'Ahmed@Gmail.com', password: PASSWORD })).status).toBe(200);
   });
 
-  it('can now use forgot-password (the lowercased lookup used to miss them)', async () => {
-    await legacyUser('Sara@Example.Test');
+  it('can use forgot-password once migrated', async () => {
+    await migratedLegacyUser('Sara@Example.Test');
     const send = jest.spyOn(MailService, 'sendPasswordReset').mockResolvedValue();
-    await post('/password/forgot', { email: 'sara@example.test' });
+    await post('/password/forgot', { email: 'SARA@example.test' });
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it('blocks a duplicate signup in a different case', async () => {
-    await legacyUser('Omar@Example.Test');
+  it('block a duplicate signup in a different case once migrated', async () => {
+    await migratedLegacyUser('Omar@Example.Test');
     const res = await post('/signup', { email: 'omar@example.test', password: PASSWORD, ...consent });
     expect(res.status).toBe(409);
   });
 
-  it('returns no account when the match is ambiguous (case-only duplicates)', async () => {
-    await legacyUser('Twin@Example.Test');
-    await legacyUser('TWIN@example.test');
-    expect(await UserService.findByEmail('twin@example.test')).toBeNull();
-    expect((await post('/login', { email: 'twin@example.test', password: PASSWORD })).status).toBe(401);
-  });
-
-  it('links native Google sign-in to the legacy account instead of creating a duplicate', async () => {
-    const id = await legacyUser('Google.User@Gmail.com');
+  it('link native Google sign-in instead of creating a duplicate once migrated', async () => {
+    const id = await migratedLegacyUser('Google.User@Gmail.com');
     jest.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({

@@ -11,6 +11,7 @@ import { getSocketService } from './socket.service';
 import { Request } from 'express';
 import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
+import { safeSearchPattern } from '../shared/search';
 
 /**
  * Admin Service
@@ -137,11 +138,12 @@ export class AdminService {
       }
       if (status === 'deleted') query._isDeleted = true;
 
-      if (search) {
+      const userPattern = safeSearchPattern(search);
+      if (userPattern) {
         query.$or = [
-          { email: { $regex: search, $options: 'i' } },
-          { username: { $regex: search, $options: 'i' } },
-          { fullName: { $regex: search, $options: 'i' } },
+          { email: { $regex: userPattern, $options: 'i' } },
+          { username: { $regex: userPattern, $options: 'i' } },
+          { fullName: { $regex: userPattern, $options: 'i' } },
         ];
       }
 
@@ -430,8 +432,9 @@ export class AdminService {
         query._isDeleted = true;
       }
 
-      if (search) {
-        query.$or = [{ title: { $regex: search, $options: 'i' } }];
+      const titlePattern = safeSearchPattern(search);
+      if (titlePattern) {
+        query.$or = [{ title: { $regex: titlePattern, $options: 'i' } }];
       }
 
       const skip = (page - 1) * limit;
@@ -672,8 +675,9 @@ export class AdminService {
       if (status === 'active') query._isDeleted = { $ne: true };
       if (status === 'deleted') query._isDeleted = true;
 
-      if (search) {
-        query.$or = [{ description: { $regex: search, $options: 'i' } }];
+      const descriptionPattern = safeSearchPattern(search);
+      if (descriptionPattern) {
+        query.$or = [{ description: { $regex: descriptionPattern, $options: 'i' } }];
       }
 
       const skip = (page - 1) * limit;

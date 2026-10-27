@@ -1,9 +1,15 @@
 /**
- * Create or update a local admin user for the Admin dashboard.
+ * Create or promote an admin user for the Admin dashboard.
  *
- * Usage:
- *   npm run seed:admin
- *   npm run seed:admin -- admin@example.com MyPassword123
+ * Usage (password from the environment keeps it out of shell history):
+ *   SEED_ADMIN_PASSWORD='<strong password>' npm run seed:admin -- admin@yourdomain.com
+ *
+ * PowerShell:
+ *   $env:SEED_ADMIN_PASSWORD='<strong password>'; npm run seed:admin '--' admin@yourdomain.com; Remove-Item Env:SEED_ADMIN_PASSWORD
+ *
+ * There is no default e-mail or password. The password must pass the same
+ * strength rules as signup and is never printed. Updating an existing user
+ * resets its password and revokes all of its sessions.
  */
 import { config } from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -11,30 +17,42 @@ import { connectToDB } from '../db';
 import { User, UserRole } from '../models/user.model';
 import { PlanSlug } from '../types/plan.types';
 import logger from '../services/logger.service';
+import { validatePassword } from '../services/password-validation.service';
+import { maskEmail, normalizeEmail } from '../shared/email';
 
 config();
 
+const SALT_ROUNDS = 12;
+
 async function seedAdmin() {
-  const email = (process.argv[2] || 'admin@example.com').toLowerCase();
-  const password = process.argv[3] || 'Admin123!';
+  const email = normalizeEmail(process.argv[2]);
+  const password = process.env.SEED_ADMIN_PASSWORD ?? '';
+
+  if (!email || !email.includes('@')) {
+    logger.error('Usage: SEED_ADMIN_PASSWORD=... npm run seed:admin -- <admin e-mail>');
+    process.exit(1);
+  }
+  const strength = validatePassword(password);
+  if (!password || !strength.isValid) {
+    logger.error(
+      'SEED_ADMIN_PASSWORD is missing or too weak. It must meet the signup password rules.'
+    );
+    process.exit(1);
+  }
 
   try {
     await connectToDB();
-
-    const hashedPassword = await bcrypt.hash(
-      password,
-      parseInt(process.env.SALT_ROUNDS || '10', 10)
-    );
-
+    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
     const existing = await User.findOne({ email });
 
     if (existing) {
       existing.role = UserRole.Admin;
       existing.isActive = true;
       existing.password = hashedPassword;
+      existing.sessions = [];
       existing.image = undefined;
       await existing.save();
-      logger.info(`Updated admin user: ${email}`);
+      logger.info(`Promoted/updated admin user ${maskEmail(email)}; existing sessions revoked`);
     } else {
       await User.create({
         email,
@@ -45,11 +63,8 @@ async function seedAdmin() {
         customPermissions: [],
         sessions: [],
       });
-      logger.info(`Created admin user: ${email}`);
+      logger.info(`Created admin user ${maskEmail(email)}`);
     }
-
-    logger.info(`Login with email: ${email}`);
-    logger.info(`Password: ${password}`);
     process.exit(0);
   } catch (error) {
     logger.error('Failed to seed admin user:', error as Error);
