@@ -43,8 +43,16 @@ export const attachPlanContext = async (
       return;
     }
 
-    // Use cache for better performance
-    const planContext = await permissionCacheService.getUserPlanContext(userId);
+    // Use cache for better performance. The cache does not clone
+    // (useClones: false), so copy before adding request-scoped temporary
+    // permissions; mutating the cached object would keep them alive after
+    // they expire.
+    const cachedContext =
+      await permissionCacheService.getUserPlanContext(userId);
+    const planContext = {
+      ...cachedContext,
+      permissions: [...cachedContext.permissions],
+    };
 
     logger.debug('[SUBSCRIPTION-BE-TRACE][PLAN-CONTEXT]', {
       plan: planContext.planSlug,
