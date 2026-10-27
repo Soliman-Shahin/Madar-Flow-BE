@@ -46,7 +46,8 @@ export const conditionalCsrfProtection = (
     '/v1/user/google',
     '/v1/user/facebook',
     '/v1/user/login',
-    '/v1/user/register',
+    // Email sign-up returns tokens in the body (no session cookie), like login.
+    '/v1/user/signup',
     '/v1/user/verify-otp',
     '/v1/user/resend-otp',
     '/v1/user/password/forgot',
