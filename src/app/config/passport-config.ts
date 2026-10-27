@@ -1,6 +1,7 @@
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { User } from '../models';
+import { UserService } from '../services/user.service';
 import dotenv from 'dotenv';
 import logger from '../utils/logger';
 
@@ -40,7 +41,7 @@ passport.use(
         const email =
           (profile as any)._json?.email || profile.emails?.[0]?.value;
         if (email) {
-          const existingByEmail = await User.findOne({ email });
+          const existingByEmail = await UserService.findByEmail(email);
           if (existingByEmail) {
             existingByEmail.socialId = profile.id;
             // Preserve existing signupType if it was already social; otherwise set to google

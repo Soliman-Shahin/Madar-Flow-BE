@@ -332,8 +332,10 @@ router.post('/auth/google/native', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Missing Google profile fields' });
     }
 
-    // Find or create user by socialId or email
-    let user = await User.findOne({ $or: [{ socialId: sub }, { email }] });
+    // Find or create user by socialId, then by (case-insensitive) email
+    let user =
+      (await User.findOne({ socialId: sub })) ??
+      (await UserService.findByEmail(email));
     if (!user) {
       try {
         assertNewAccountConsent(req.body);

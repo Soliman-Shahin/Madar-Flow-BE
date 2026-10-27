@@ -12,7 +12,8 @@
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node\" src/app/server.ts",
     "seed:plans": "ts-node src/app/scripts/seed-plans.ts",
     "seed:admin": "ts-node src/app/scripts/seed-admin.ts",
-    "seed:roles": "ts-node src/app/scripts/seed-roles.ts"
+    "seed:roles": "ts-node src/app/scripts/seed-roles.ts",
+    "migrate:emails": "ts-node src/app/scripts/normalize-emails.ts"
   },
   "author": "Orbit Madar",
   "license": "ISC",

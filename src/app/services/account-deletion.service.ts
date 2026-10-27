@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { MailService } from './mail.service';
+import { UserService } from './user.service';
 import { Types } from 'mongoose';
 import {
   AuditLog,
@@ -110,11 +111,11 @@ export class AccountDeletionService {
       typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
     if (!EMAIL_PATTERN.test(email) || email.length > 254) return;
 
-    const user = await User.findOne({
+    const user = await UserService.findByEmail(
       email,
-      _isDeleted: { $ne: true },
-      isActive: { $ne: false },
-    }).select('_id role');
+      { _isDeleted: { $ne: true }, isActive: { $ne: false } },
+      '_id role'
+    );
     if (!user || (user.role || UserRole.User) !== UserRole.User) return;
 
     const token = crypto.randomBytes(32).toString('hex');

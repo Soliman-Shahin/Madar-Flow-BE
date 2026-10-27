@@ -60,7 +60,7 @@ const signUp = async (req: CustomRequest, res: Response) => {
     }
 
     // Check if the e-mail is taken, whatever password was supplied.
-    if (await User.exists({ email })) {
+    if (await UserService.findByEmail(email)) {
       throw new ConflictError('Email already used');
     }
 
@@ -248,8 +248,7 @@ const requestPasswordReset = async (req: CustomRequest, res: Response) => {
       .trim()
       .toLowerCase();
     if (!email) return sendSuccess(res, {}, generic);
-    const user = await User.findOne({
-      email,
+    const user = await UserService.findByEmail(email, {
       _isDeleted: { $ne: true },
       isActive: { $ne: false },
     });

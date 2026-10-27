@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 import { config } from 'dotenv';
 import { NotificationService } from './notification.service';
 import logger from './logger.service';
+import { QueryFilter } from 'mongoose';
+import { maskEmail, normalizeEmail } from '../shared/email';
 config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
@@ -56,13 +58,55 @@ export class UserService {
     return { accessToken, refreshToken };
   }
 
+  /**
+   * Finds a user by e-mail, case-insensitively.
+   *
+   * The indexed lookup uses the normalized (lowercase) address. Accounts
+   * created before e-mail normalization may still be stored mixed-case
+   * until `npm run migrate:emails -- --apply` has run, so a miss falls back
+   * to a case-insensitive collation match. If that fallback is ambiguous
+   * (two accounts differing only by case), nothing is returned rather than
+   * guessing. TRANSITION: remove the fallback once production is migrated
+   * and the migration reports no collisions.
+   */
+  static async findByEmail(
+    rawEmail: unknown,
+    filter: QueryFilter<UserDocument> = {},
+    select?: string
+  ): Promise<UserDocument | null> {
+    const email = normalizeEmail(rawEmail);
+    if (!email) return null;
+
+    const exactQuery = User.findOne({ ...filter, email });
+    if (select) exactQuery.select(select);
+    const exact = await exactQuery;
+    if (exact) return exact;
+
+    const legacyQuery = User.find({ ...filter, email })
+      .collation({ locale: 'en', strength: 2 })
+      .limit(2);
+    if (select) legacyQuery.select(select);
+    const legacy = await legacyQuery;
+    if (legacy.length > 1) {
+      logger.warn('Ambiguous mixed-case e-mail match; run the e-mail migration', {
+        email: maskEmail(email),
+      });
+      return null;
+    }
+    return legacy[0] ?? null;
+  }
+
   // Create a new user
   static async createUser(
     email: string,
     hashedPassword: string,
     extra: Record<string, unknown> = {}
   ): Promise<UserDocument> {
-    const user = new User({ email, password: hashedPassword, ...extra });
+    const user = new User({
+      email: normalizeEmail(email),
+      password: hashedPassword,
+      ...extra,
+    });
     await user.save();
     return user;
   }
@@ -74,7 +118,7 @@ export class UserService {
   ): Promise<UserDocument> {
     // Exclude large profile fields (e.g. base64 avatar) — loading them from
     // Atlas was adding 10-15s to every login for users with uploaded images.
-    const user = await User.findOne({ email }).select('-image');
+    const user = await this.findByEmail(email, {}, '-image');
     if (!user) throw new Error('User not found');
     if (user._isDeleted) throw new Error('Account has been deleted');
     if (user.isActive === false) throw new Error('Account is deactivated');
