@@ -5,6 +5,7 @@ import { Request } from 'express';
 import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import logger from './logger.service';
+import { safeSearchPattern } from '../shared/search';
 
 export class ExpenseService {
   private static async notifyAndAudit(params: {
@@ -112,8 +113,9 @@ export class ExpenseService {
       }
 
       // Search filter
-      if (filters?.search) {
-        query.description = { $regex: filters.search, $options: 'i' };
+      const searchPattern = safeSearchPattern(filters?.search);
+      if (searchPattern) {
+        query.description = { $regex: searchPattern, $options: 'i' };
       }
 
       // Category filter (convert to ObjectId if present)
@@ -186,8 +188,9 @@ export class ExpenseService {
     }
 
     // Search filter
-    if (filters?.search) {
-      query.description = { $regex: filters.search, $options: 'i' };
+    const searchPattern = safeSearchPattern(filters?.search);
+    if (searchPattern) {
+      query.description = { $regex: searchPattern, $options: 'i' };
     }
 
     // Category filter

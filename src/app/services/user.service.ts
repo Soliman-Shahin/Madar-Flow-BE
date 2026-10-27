@@ -6,7 +6,7 @@ import { config } from 'dotenv';
 import { NotificationService } from './notification.service';
 import logger from './logger.service';
 import { QueryFilter } from 'mongoose';
-import { maskEmail, normalizeEmail } from '../shared/email';
+import { normalizeEmail } from '../shared/email';
 config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
@@ -59,15 +59,9 @@ export class UserService {
   }
 
   /**
-   * Finds a user by e-mail, case-insensitively.
-   *
-   * The indexed lookup uses the normalized (lowercase) address. Accounts
-   * created before e-mail normalization may still be stored mixed-case
-   * until `npm run migrate:emails -- --apply` has run, so a miss falls back
-   * to a case-insensitive collation match. If that fallback is ambiguous
-   * (two accounts differing only by case), nothing is returned rather than
-   * guessing. TRANSITION: remove the fallback once production is migrated
-   * and the migration reports no collisions.
+   * Finds a user by e-mail. Stored e-mails are lowercase (schema
+   * `lowercase: true`; legacy rows are fixed by `npm run migrate:emails`), so
+   * the normalized address is an exact, indexed match.
    */
   static async findByEmail(
     rawEmail: unknown,
@@ -76,24 +70,9 @@ export class UserService {
   ): Promise<UserDocument | null> {
     const email = normalizeEmail(rawEmail);
     if (!email) return null;
-
-    const exactQuery = User.findOne({ ...filter, email });
-    if (select) exactQuery.select(select);
-    const exact = await exactQuery;
-    if (exact) return exact;
-
-    const legacyQuery = User.find({ ...filter, email })
-      .collation({ locale: 'en', strength: 2 })
-      .limit(2);
-    if (select) legacyQuery.select(select);
-    const legacy = await legacyQuery;
-    if (legacy.length > 1) {
-      logger.warn('Ambiguous mixed-case e-mail match; run the e-mail migration', {
-        email: maskEmail(email),
-      });
-      return null;
-    }
-    return legacy[0] ?? null;
+    const query = User.findOne({ ...filter, email });
+    if (select) query.select(select);
+    return query.exec();
   }
 
   // Create a new user

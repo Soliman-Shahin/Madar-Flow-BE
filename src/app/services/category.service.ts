@@ -6,6 +6,7 @@ import { Request } from 'express';
 import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import logger from './logger.service';
+import { safeSearchPattern } from '../shared/search';
 
 export class CategoryService {
   private static async notifyAndAudit(params: {
@@ -96,7 +97,8 @@ export class CategoryService {
       user: userId,
       _isDeleted: { $ne: true }, // Exclude deleted items from normal queries
     };
-    if (q) filter.title = { $regex: q, $options: 'i' };
+    const titlePattern = safeSearchPattern(q);
+    if (titlePattern) filter.title = { $regex: titlePattern, $options: 'i' };
     if (type) filter.type = type;
     const sortField = sort.startsWith('-') ? sort.substring(1) : sort;
     const sortOrder = sort.startsWith('-') ? -1 : 1;
