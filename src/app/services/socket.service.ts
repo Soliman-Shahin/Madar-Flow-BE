@@ -101,6 +101,10 @@ export class SocketService {
       .to(`user:${userId}`)
       .emit('ReceiveNotification', enrichedNotification);
   }
+
+  public disconnectUser(userId: string) {
+    this.io.in(`user:${userId}`).disconnectSockets(true);
+  }
 }
 
 // We will initialize this in server.ts and export a getter if needed

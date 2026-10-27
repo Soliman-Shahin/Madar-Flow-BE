@@ -11,6 +11,7 @@ import { BRAND } from './config/brand.config';
 import { conditionalCsrfProtection } from './middleware/csrf.middleware';
 import routes from './routes';
 import healthRoutes from './routes/health.route';
+import accountPageRoutes from './routes/account-page.route';
 import { enhancedErrorHandler } from './middleware/error-handler-enhanced';
 // Import sync middleware to apply them to the correct routes only
 import {
@@ -50,6 +51,10 @@ function configureExpressApp(): express.Application {
   app.use(requestLogger);
 
   app.use(passport.initialize());
+
+  // Public HTML account pages (Google Play account-deletion URL). Mounted
+  // before CORS/CSRF/encryption; see routes/account-page.route.ts.
+  app.use('/account', accountPageRoutes);
 
   app.use(cors(corsOptions));
   app.options(/^.*$/, cors(corsOptions));
