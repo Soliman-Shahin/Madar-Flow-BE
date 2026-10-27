@@ -105,6 +105,11 @@ export class SocketService {
   public disconnectUser(userId: string) {
     this.io.in(`user:${userId}`).disconnectSockets(true);
   }
+
+  /** Disconnects every client and closes the underlying HTTP server. */
+  public close(): Promise<void> {
+    return new Promise((resolve) => this.io.close(() => resolve()));
+  }
 }
 
 // We will initialize this in server.ts and export a getter if needed

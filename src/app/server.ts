@@ -5,6 +5,7 @@ import { configureExpressApp } from './app';
 import { planService } from './services/plan.service';
 
 import { createServer } from 'http';
+import mongoose from 'mongoose';
 import { initializeSocketService } from './services/socket.service';
 import { validateEncryptionKey } from './config/encryption-config';
 import { subscriptionExpiryReminderJob } from './jobs/subscription-expiry-reminder.job';
@@ -40,6 +41,45 @@ function validateEnvironmentVariables(): void {
   logger.info('[server]: Environment variables validated successfully ✓');
 }
 
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+
+/**
+ * Railway (and most hosts) send SIGTERM on every redeploy. Stop scheduled jobs,
+ * close Socket.IO and the HTTP server so in-flight requests can finish, then
+ * close MongoDB. A hard timeout guarantees the process still exits.
+ */
+function registerGracefulShutdown(closeServer: () => Promise<void>): void {
+  let shuttingDown = false;
+
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info(`[server]: ${signal} received, shutting down gracefully`);
+
+    const forceExit = setTimeout(() => {
+      logger.error('[server]: Graceful shutdown timed out; forcing exit');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    forceExit.unref();
+
+    try {
+      subscriptionExpiryReminderJob.stop();
+      notificationArchivalJob.stop();
+      sessionCleanupJob.stop();
+      await closeServer();
+      await mongoose.connection.close();
+      logger.info('[server]: Shutdown complete');
+      process.exit(0);
+    } catch (error) {
+      logger.error('[server]: Error during shutdown', error as Error);
+      process.exit(1);
+    }
+  };
+
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
+}
+
 async function startServer() {
   try {
     config();
@@ -58,7 +98,7 @@ async function startServer() {
     const httpServer = createServer(app);
 
     // Initialize WebSockets
-    initializeSocketService(httpServer);
+    const socketService = initializeSocketService(httpServer);
 
     const port = process.env.PORT ?? DEFAULT_PORT;
     httpServer.listen(port, () => {
@@ -67,6 +107,8 @@ async function startServer() {
       notificationArchivalJob.start();
       sessionCleanupJob.start();
     });
+
+    registerGracefulShutdown(() => socketService.close());
   } catch (error) {
     logger.error('Failed to start server:', error as Error);
     process.exit(1);
