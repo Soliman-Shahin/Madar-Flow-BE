@@ -410,16 +410,31 @@ describe('Insights HTTP permissions and validation', () => {
         .auth(auth, { type: 'bearer' });
     for (const path of [
       'engagement?days=8',
-      'engagement?plan=pro',
       'engagement?days=7&days=30',
       'engagement?days[$gt]=1',
+      'engagement?start=2026-10-01',
+      'engagement?days=7&start=2026-10-01&end=2026-10-07',
+      'engagement?start=2026-10-01&end=2026-10-27',
       'subscriptions?horizon=90',
       'subscriptions?page=0',
       'subscriptions?page=1.5',
       'subscriptions?page=10000',
-      'subscriptions?plan=pro',
+      'subscriptions?type=income',
     ])
       expect((await get(path)).status).toBe(400);
+    expect(
+      (
+        await get(
+          'engagement?start=2026-10-01&end=2026-10-10&compare=yearAgo&plan=pro&type=outcome'
+        )
+      ).body.data
+    ).toMatchObject({
+      period: { days: 10, comparison: 'yearAgo' },
+      filters: { plan: 'pro', type: 'outcome' },
+    });
+    expect((await get('subscriptions?plan=pro')).body.data).toMatchObject({
+      filters: { plan: 'pro' },
+    });
     expect((await get('subscriptions')).body.data).toMatchObject({
       horizon: 7,
       expiring: { page: 1, total: 0 },

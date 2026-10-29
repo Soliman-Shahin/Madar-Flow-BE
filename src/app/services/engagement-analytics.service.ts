@@ -1,22 +1,49 @@
 import { PipelineStage } from 'mongoose';
 import { Expense } from '../models/expense.model';
 import { User } from '../models/user.model';
-import { AnalyticsDays, analyticsPeriod } from './admin-analytics.service';
+import {
+  AnalyticsFilters,
+  AnalyticsPeriodSelection,
+  resolveAnalyticsPeriod,
+} from './admin-analytics.service';
 
 const DAY = 86_400_000;
-const consumerScope = { role: 'user', _isDeleted: { $ne: true } };
-const retainedOwners: PipelineStage[] = [
+const consumers = { role: 'user', _isDeleted: { $ne: true } };
+const consumerScope = (filters: AnalyticsFilters) => ({
+  ...consumers,
+  ...(filters.plan ? { plan: filters.plan } : {}),
+});
+const retainedOwners = (filters: AnalyticsFilters): PipelineStage[] => [
   {
     $lookup: {
       from: 'users',
       localField: 'user',
       foreignField: '_id',
-      pipeline: [{ $match: consumerScope }, { $project: { _id: 1 } }],
+      pipeline: [{ $match: consumerScope(filters) }, { $project: { _id: 1 } }],
       as: 'owner',
     },
   },
   { $match: { 'owner.0': { $exists: true } } },
 ];
+const recordTypeScope = (filters: AnalyticsFilters): any[] =>
+  filters.type
+    ? [
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            pipeline: [
+              { $match: { type: filters.type } },
+              { $project: { _id: 1 } },
+            ],
+            as: 'matchingCategory',
+          },
+        },
+        { $match: { 'matchingCategory.0': { $exists: true } } },
+        { $unset: 'matchingCategory' },
+      ]
+    : [];
 const key = (value: Date) => value.toISOString().slice(0, 10);
 const midnight = (value: Date) => {
   const date = new Date(value);
@@ -25,8 +52,13 @@ const midnight = (value: Date) => {
 };
 
 export class EngagementAnalyticsService {
-  async overview(days: AnalyticsDays, now = new Date()) {
-    const { start, end, previousStart } = analyticsPeriod(days, now);
+  async overview(
+    selection: AnalyticsPeriodSelection,
+    now = new Date(),
+    filters: AnalyticsFilters = {}
+  ) {
+    const period = resolveAnalyticsPeriod(selection, now);
+    const { days, start, end, previousStart, previousEnd } = period;
     const coverageRows = await Expense.aggregate([
       {
         $match: {
@@ -34,7 +66,8 @@ export class EngagementAnalyticsService {
           _serverRecordedAt: { $type: 'date' },
         },
       },
-      ...retainedOwners,
+      ...retainedOwners(filters),
+      ...recordTypeScope(filters),
       {
         $group: {
           _id: null,
@@ -67,7 +100,8 @@ export class EngagementAnalyticsService {
                 _serverRecordedAt: { $gte: effectivePreviousStart, $lt: end },
               },
             },
-            ...retainedOwners,
+            ...retainedOwners(filters),
+            ...recordTypeScope(filters),
             {
               $facet: {
                 daily: [
@@ -114,7 +148,7 @@ export class EngagementAnalyticsService {
                     $match: {
                       _serverRecordedAt: {
                         $gte: effectivePreviousStart,
-                        $lt: start,
+                        $lt: previousEnd,
                       },
                     },
                   },
@@ -163,7 +197,7 @@ export class EngagementAnalyticsService {
         ? await User.aggregate([
             {
               $match: {
-                ...consumerScope,
+                ...consumerScope(filters),
                 createdAt: { $gte: effectiveStart, $lt: end },
               },
             },
@@ -199,6 +233,7 @@ export class EngagementAnalyticsService {
                       },
                     },
                   },
+                  ...recordTypeScope(filters),
                   {
                     $group: {
                       _id: {
@@ -295,15 +330,19 @@ export class EngagementAnalyticsService {
           ? activity.current[0]?.[field] || 0
           : null,
       previous:
-        effectivePreviousStart < start && completeFrom
+        effectivePreviousStart < previousEnd && completeFrom
           ? activity.previous[0]?.[field] || 0
           : null,
     });
     return {
       period: {
         days,
+        presetDays: period.presetDays,
+        comparison: period.comparison,
         start: start.toISOString(),
         endExclusive: end.toISOString(),
+        previousStart: previousStart.toISOString(),
+        previousEndExclusive: previousEnd.toISOString(),
         timezone: 'UTC',
         generatedAt: now.toISOString(),
       },
@@ -315,6 +354,7 @@ export class EngagementAnalyticsService {
         previousDays: series.filter((row) => row.previous !== null).length,
       },
       metrics: { recordingUsers: metric('users'), records: metric('records') },
+      filters: { plan: filters.plan || null, type: filters.type || null },
       series,
       cohorts,
     };

@@ -1,6 +1,10 @@
 import { User } from '../models/user.model';
 import { Subscription } from '../models/subscription.model';
-import { AnalyticsDays, analyticsPeriod } from './admin-analytics.service';
+import {
+  AnalyticsFilters,
+  AnalyticsPeriodSelection,
+  resolveAnalyticsPeriod,
+} from './admin-analytics.service';
 
 const DAY = 86_400_000;
 const consumers = { role: 'user', _isDeleted: { $ne: true } };
@@ -8,16 +12,23 @@ const paidTiers = ['pro', 'premium'];
 
 export class SubscriptionAnalyticsService {
   async overview(
-    days: AnalyticsDays,
+    selection: AnalyticsPeriodSelection,
     horizon: 7 | 30,
     page: number,
-    now = new Date()
+    now = new Date(),
+    filters: Pick<AnalyticsFilters, 'plan'> = {}
   ) {
-    const { start, end } = analyticsPeriod(days, now);
+    const period = resolveAnalyticsPeriod(selection, now);
+    const { days, start, end } = period;
     const until = new Date(now.getTime() + horizon * DAY);
     const [accountResults, history] = await Promise.all([
       User.aggregate([
-        { $match: consumers },
+        {
+          $match: {
+            ...consumers,
+            ...(filters.plan ? { plan: filters.plan } : {}),
+          },
+        },
         {
           $lookup: {
             from: 'subscriptions',
@@ -241,7 +252,15 @@ export class SubscriptionAnalyticsService {
             from: 'users',
             localField: 'user',
             foreignField: '_id',
-            pipeline: [{ $match: consumers }, { $project: { _id: 1 } }],
+            pipeline: [
+              {
+                $match: {
+                  ...consumers,
+                  ...(filters.plan ? { plan: filters.plan } : {}),
+                },
+              },
+              { $project: { _id: 1 } },
+            ],
             as: 'owner',
           },
         },
@@ -272,12 +291,15 @@ export class SubscriptionAnalyticsService {
     return {
       period: {
         days,
+        presetDays: period.presetDays,
+        comparison: period.comparison,
         start: start.toISOString(),
         endExclusive: end.toISOString(),
         timezone: 'UTC',
         generatedAt: now.toISOString(),
       },
       horizon,
+      filters: { plan: filters.plan || null },
       metrics: Object.fromEntries(
         [
           'retainedAccounts',

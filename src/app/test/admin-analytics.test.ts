@@ -13,6 +13,7 @@ import {
   AdminAnalyticsService,
   analyticsPeriod,
   compareMetric,
+  resolveAnalyticsPeriod,
 } from '../services/admin-analytics.service';
 import adminRoutes from '../routes/admin.route';
 import { planService } from '../services/plan.service';
@@ -64,6 +65,40 @@ describe('Admin analytics data contract', () => {
     expect(compareMetric(3, 0).changePercent).toBeNull();
     expect(compareMetric(0, 0).changePercent).toBeNull();
     expect(compareMetric(6, 4).changePercent).toBe(50);
+  });
+
+  it('resolves bounded custom UTC ranges with equal previous and year-ago comparisons', () => {
+    expect(
+      resolveAnalyticsPeriod(
+        { start: '2026-10-01', end: '2026-10-10', comparison: 'previous' },
+        now
+      )
+    ).toMatchObject({
+      days: 10,
+      presetDays: null,
+      comparison: 'previous',
+      start: new Date('2026-10-01T00:00:00Z'),
+      end: new Date('2026-10-11T00:00:00Z'),
+      previousStart: new Date('2026-09-21T00:00:00Z'),
+      previousEnd: new Date('2026-10-01T00:00:00Z'),
+    });
+    expect(
+      resolveAnalyticsPeriod(
+        { start: '2026-10-01', end: '2026-10-10', comparison: 'yearAgo' },
+        now
+      )
+    ).toMatchObject({
+      days: 10,
+      comparison: 'yearAgo',
+      previousStart: new Date('2025-10-01T00:00:00Z'),
+      previousEnd: new Date('2025-10-11T00:00:00Z'),
+    });
+    expect(() =>
+      resolveAnalyticsPeriod({ start: '2026-10-01', end: '2026-10-27' }, now)
+    ).toThrow(/complete UTC days/);
+    expect(() =>
+      resolveAnalyticsPeriod({ start: '2025-01-01', end: '2026-01-02' }, now)
+    ).toThrow(/366/);
   });
 
   it('zero fills sparse periods without inventing comparisons or status', async () => {

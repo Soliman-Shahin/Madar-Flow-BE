@@ -5,6 +5,13 @@ import { Expense } from '../models/expense.model';
 import { SyncConflict, SyncOperation } from '../models/sync.model';
 
 export type AnalyticsDays = 7 | 30 | 90;
+export type AnalyticsComparison = 'previous' | 'yearAgo';
+export interface AnalyticsCustomRange {
+  start: string;
+  end: string;
+  comparison?: AnalyticsComparison;
+}
+export type AnalyticsPeriodSelection = AnalyticsDays | AnalyticsCustomRange;
 export type AnalyticsKind = 'newUsers' | 'recordingUsers' | 'expenses';
 export interface AnalyticsFilters {
   plan?: PlanSlug;
@@ -90,6 +97,71 @@ export function analyticsPeriod(days: AnalyticsDays, now = new Date()) {
   };
 }
 
+function shiftUtcYear(value: Date, amount: number): Date {
+  return new Date(
+    Date.UTC(
+      value.getUTCFullYear() + amount,
+      value.getUTCMonth(),
+      value.getUTCDate()
+    )
+  );
+}
+
+export function resolveAnalyticsPeriod(
+  selection: AnalyticsPeriodSelection,
+  now = new Date(),
+  comparison: AnalyticsComparison = 'previous'
+) {
+  const today = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  const preset = typeof selection === 'number' ? selection : null;
+  const activeComparison =
+    typeof selection === 'number'
+      ? comparison
+      : selection.comparison || 'previous';
+  const start =
+    typeof selection === 'number'
+      ? new Date(today.getTime() - selection * DAY)
+      : new Date(`${selection.start}T00:00:00.000Z`);
+  const end =
+    typeof selection === 'number'
+      ? today
+      : new Date(
+          new Date(`${selection.end}T00:00:00.000Z`).getTime() + DAY
+        );
+  const days = Math.round((end.getTime() - start.getTime()) / DAY);
+  if (
+    !Number.isFinite(start.getTime()) ||
+    !Number.isFinite(end.getTime()) ||
+    days < 1 ||
+    days > 366 ||
+    end > today ||
+    (typeof selection !== 'number' &&
+      (start.toISOString().slice(0, 10) !== selection.start ||
+        new Date(end.getTime() - DAY).toISOString().slice(0, 10) !==
+          selection.end))
+  ) {
+    throw new RangeError(
+      'Choose between 1 and 366 complete UTC days ending before today.'
+    );
+  }
+  const previousEnd =
+    activeComparison === 'previous'
+      ? start
+      : shiftUtcYear(end, -1);
+  const previousStart = new Date(previousEnd.getTime() - days * DAY);
+  return {
+    days,
+    presetDays: preset,
+    comparison: activeComparison,
+    start,
+    end,
+    previousStart,
+    previousEnd,
+  };
+}
+
 export function compareMetric(current: number, previous: number) {
   return {
     current,
@@ -122,11 +194,12 @@ function recordingCount(
 
 export class AdminAnalyticsService {
   async overview(
-    days: AnalyticsDays,
+    selection: AnalyticsPeriodSelection,
     now = new Date(),
     filters: AnalyticsFilters = {}
   ) {
-    const { start, end, previousStart } = analyticsPeriod(days, now);
+    const period = resolveAnalyticsPeriod(selection, now);
+    const { days, start, end, previousStart, previousEnd } = period;
     const [
       userDays,
       expenseResults,
@@ -165,7 +238,7 @@ export class AdminAnalyticsService {
               },
             ],
             current: recordingCount(start, end),
-            previous: recordingCount(previousStart, start),
+            previous: recordingCount(previousStart, previousEnd),
             categories: [
               { $match: { createdAt: { $gte: start } } },
               { $group: { _id: '$category', count: { $sum: 1 } } },
@@ -273,10 +346,13 @@ export class AdminAnalyticsService {
     return {
       period: {
         days,
+        presetDays: period.presetDays,
+        comparison: period.comparison,
         timezone: 'UTC',
         start: start.toISOString(),
         endExclusive: end.toISOString(),
         previousStart: previousStart.toISOString(),
+        previousEndExclusive: previousEnd.toISOString(),
         generatedAt: now.toISOString(),
       },
       scope: 'retained-consumer-accounts',
@@ -311,7 +387,7 @@ export class AdminAnalyticsService {
 
   async records(
     kind: AnalyticsKind,
-    days: AnalyticsDays,
+    selection: AnalyticsPeriodSelection,
     day: string | undefined,
     page: number,
     now = new Date(),
@@ -323,11 +399,16 @@ export class AdminAnalyticsService {
     if (
       !Number.isFinite(anchor.getTime()) ||
       (asOf && anchor.toISOString().slice(0, 10) !== asOf) ||
-      (asOf && anchor > analyticsPeriod(days, now).end)
+      (asOf &&
+        typeof selection === 'number' &&
+        anchor > analyticsPeriod(selection, now).end)
     ) {
       throw new RangeError('Invalid analytics period anchor.');
     }
-    const period = analyticsPeriod(days, anchor);
+    const period = resolveAnalyticsPeriod(
+      selection,
+      typeof selection === 'number' ? anchor : now
+    );
     const start = day ? new Date(`${day}T00:00:00.000Z`) : period.start;
     const end = day ? new Date(start.getTime() + DAY) : period.end;
     if (

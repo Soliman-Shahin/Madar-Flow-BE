@@ -7,16 +7,33 @@ import { subscriptionAnalyticsService } from '../services/subscription-analytics
 import {
   adminAnalyticsService,
   AnalyticsDays,
+  AnalyticsPeriodSelection,
 } from '../services/admin-analytics.service';
 
-const periodQuery = z
-  .object({
-    days: z.enum(['7', '30', '90']).default('30'),
+const dateParam = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const periodFields = {
+    days: z.enum(['7', '30', '90']).optional(),
+    start: dateParam.optional(),
+    end: dateParam.optional(),
+    compare: z.enum(['previous', 'yearAgo']).default('previous'),
     plan: z.enum(PlanSlug).optional(),
     type: z.enum(['income', 'outcome']).optional(),
-  })
-  .strict();
-const recordsQuery = periodQuery.extend({
+  };
+const validatePeriod = (
+  value: { days?: string; start?: string; end?: string },
+  context: z.RefinementCtx
+) => {
+  const custom = !!value.start || !!value.end;
+  if ((custom && (!value.start || !value.end)) || (custom && !!value.days)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Use either days or a complete start/end range.',
+    });
+  }
+};
+const periodQuery = z.object(periodFields).strict().superRefine(validatePeriod);
+const recordsQuery = z.object({
+  ...periodFields,
   asOf: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -30,15 +47,26 @@ const recordsQuery = periodQuery.extend({
     .string()
     .regex(/^[1-9]\d{0,3}$/)
     .default('1'),
-});
+}).strict().superRefine(validatePeriod);
+
+function periodSelection(value: {
+  days?: string;
+  start?: string;
+  end?: string;
+  compare?: 'previous' | 'yearAgo';
+}): AnalyticsPeriodSelection {
+  return value.start && value.end
+    ? { start: value.start, end: value.end, comparison: value.compare }
+    : (Number(value.days || 30) as AnalyticsDays);
+}
 
 export const adminAnalyticsController = {
   async engagement(req: Request, res: Response, next: NextFunction) {
-    const query = periodQuery.pick({ days: true }).safeParse(req.query);
+    const query = periodQuery.safeParse(req.query);
     if (!query.success)
       return sendError(
         res,
-        'Choose a 7, 30 or 90 day period.',
+        'Choose a preset period or a complete start/end range.',
         400,
         'INVALID_ANALYTICS_QUERY'
       );
@@ -46,23 +74,29 @@ export const adminAnalyticsController = {
       return sendSuccess(
         res,
         await engagementAnalyticsService.overview(
-          Number(query.data.days) as AnalyticsDays
+          periodSelection(query.data),
+          undefined,
+          { plan: query.data.plan, type: query.data.type }
         )
       );
     } catch (error) {
+      if (error instanceof RangeError)
+        return sendError(res, error.message, 400, 'INVALID_ANALYTICS_QUERY');
       return next(error);
     }
   },
   async subscriptions(req: Request, res: Response, next: NextFunction) {
-    const query = periodQuery
-      .pick({ days: true })
-      .extend({
+    const query = z
+      .object({
+        ...periodFields,
+        plan: z.enum(PlanSlug).optional(),
+        type: z.never().optional(),
         horizon: z.enum(['7', '30']).default('7'),
         page: z
           .string()
           .regex(/^[1-9]\d{0,3}$/)
           .default('1'),
-      })
+      }).strict().superRefine(validatePeriod)
       .safeParse(req.query);
     if (!query.success)
       return sendError(
@@ -75,12 +109,16 @@ export const adminAnalyticsController = {
       return sendSuccess(
         res,
         await subscriptionAnalyticsService.overview(
-          Number(query.data.days) as AnalyticsDays,
+          periodSelection(query.data),
           Number(query.data.horizon) as 7 | 30,
-          Number(query.data.page)
+          Number(query.data.page),
+          undefined,
+          { plan: query.data.plan }
         )
       );
     } catch (error) {
+      if (error instanceof RangeError)
+        return sendError(res, error.message, 400, 'INVALID_ANALYTICS_QUERY');
       return next(error);
     }
   },
@@ -89,7 +127,7 @@ export const adminAnalyticsController = {
     if (!query.success)
       return sendError(
         res,
-        'Choose a 7, 30 or 90 day period.',
+        'Choose a preset period or a complete start/end range.',
         400,
         'INVALID_ANALYTICS_QUERY'
       );
@@ -97,13 +135,15 @@ export const adminAnalyticsController = {
       return sendSuccess(
         res,
         await adminAnalyticsService.overview(
-          Number(query.data.days) as AnalyticsDays,
+          periodSelection(query.data),
           undefined,
           { plan: query.data.plan, type: query.data.type }
         ),
         'Analytics retrieved successfully'
       );
     } catch (error) {
+      if (error instanceof RangeError)
+        return sendError(res, error.message, 400, 'INVALID_ANALYTICS_QUERY');
       return next(error);
     }
   },
@@ -117,12 +157,12 @@ export const adminAnalyticsController = {
         'INVALID_ANALYTICS_QUERY'
       );
     try {
-      const { kind, days, day, page, asOf, plan, type } = query.data;
+      const { kind, day, page, asOf, plan, type } = query.data;
       return sendSuccess(
         res,
         await adminAnalyticsService.records(
           kind,
-          Number(days) as AnalyticsDays,
+          periodSelection(query.data),
           day,
           Number(page),
           undefined,
