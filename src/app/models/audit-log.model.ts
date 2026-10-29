@@ -39,6 +39,9 @@ export enum AuditAction {
   PLAN_DOWNGRADED = 'plan:downgraded',
   PLAN_EXPIRED = 'plan:expired',
 
+  // App content (dashboard-managed settings)
+  APP_SETTINGS_UPDATED = 'app_settings:updated',
+
   // Resource Management
   EXPENSE_CREATED = 'expense:created',
   EXPENSE_UPDATED = 'expense:updated',
