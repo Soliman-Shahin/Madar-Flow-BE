@@ -7,7 +7,7 @@ import { SyncConflict, SyncOperation } from '../models/sync.model';
 export type AnalyticsDays = 7 | 30 | 90;
 export type AnalyticsKind = 'newUsers' | 'recordingUsers' | 'expenses';
 export interface AnalyticsFilters {
-  plan?: string;
+  plan?: PlanSlug;
   type?: 'income' | 'outcome';
 }
 const DAY = 86_400_000;
@@ -36,7 +36,7 @@ const ownerScope: PipelineStage[] = [
 function consumerScope(filters: AnalyticsFilters) {
   return {
     ...consumers,
-    ...(filters.plan ? { plan: filters.plan as PlanSlug } : {}),
+    ...(filters.plan ? { plan: filters.plan } : {}),
   };
 }
 

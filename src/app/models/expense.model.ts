@@ -21,6 +21,7 @@ export interface IExpense extends Document {
   // Mongoose timestamps
   createdAt?: Date;
   updatedAt?: Date;
+  _serverRecordedAt?: Date;
 }
 
 const expenseSchema = new Schema(
@@ -30,6 +31,8 @@ const expenseSchema = new Schema(
     category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
     date: { type: Date, required: true },
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    // Internal observation time. Historical/client-created timestamps are not telemetry.
+    _serverRecordedAt: { type: Date, immutable: true, select: false },
     // Sync fields
     _syncStatus: {
       type: String,
@@ -45,6 +48,21 @@ const expenseSchema = new Schema(
   },
   { timestamps: true }
 );
+
+expenseSchema.pre('save', function () {
+  if (this.isNew) this.set('_serverRecordedAt', new Date());
+});
+const hideObservationTime = (
+  _document: unknown,
+  value: Record<string, unknown>
+) => {
+  delete value._serverRecordedAt;
+  return value;
+};
+expenseSchema.set('toJSON', { transform: hideObservationTime });
+expenseSchema.set('toObject', { transform: hideObservationTime });
+expenseSchema.index({ _serverRecordedAt: -1, user: 1 });
+expenseSchema.index({ user: 1, _serverRecordedAt: -1 });
 
 // Index for sync operations
 expenseSchema.index({ user: 1, _lastModified: -1 });
