@@ -71,6 +71,8 @@ SubscriptionSchema.index({ user: 1, status: 1 });
 SubscriptionSchema.index({ endDate: 1, status: 1 });
 // Audit history: list all subscriptions for a user ordered by start date
 SubscriptionSchema.index({ user: 1, startDate: -1 });
+// Bounded daily history analytics across retained consumer accounts.
+SubscriptionSchema.index({ startDate: -1, user: 1 });
 
 const Subscription = model<ISubscription>('Subscription', SubscriptionSchema);
 export { Subscription };

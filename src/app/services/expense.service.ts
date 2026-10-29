@@ -151,6 +151,7 @@ export class ExpenseService {
         {
           $project: {
             categoryDetails: 0,
+            _serverRecordedAt: 0,
           },
         },
         {

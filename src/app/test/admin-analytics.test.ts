@@ -13,9 +13,11 @@ import {
   AdminAnalyticsService,
   analyticsPeriod,
   compareMetric,
+  resolveAnalyticsPeriod,
 } from '../services/admin-analytics.service';
 import adminRoutes from '../routes/admin.route';
 import { planService } from '../services/plan.service';
+import { PlanSlug } from '../types/plan.types';
 
 const service = new AdminAnalyticsService();
 const now = new Date('2026-10-27T12:34:00Z');
@@ -63,6 +65,40 @@ describe('Admin analytics data contract', () => {
     expect(compareMetric(3, 0).changePercent).toBeNull();
     expect(compareMetric(0, 0).changePercent).toBeNull();
     expect(compareMetric(6, 4).changePercent).toBe(50);
+  });
+
+  it('resolves bounded custom UTC ranges with equal previous and year-ago comparisons', () => {
+    expect(
+      resolveAnalyticsPeriod(
+        { start: '2026-10-01', end: '2026-10-10', comparison: 'previous' },
+        now
+      )
+    ).toMatchObject({
+      days: 10,
+      presetDays: null,
+      comparison: 'previous',
+      start: new Date('2026-10-01T00:00:00Z'),
+      end: new Date('2026-10-11T00:00:00Z'),
+      previousStart: new Date('2026-09-21T00:00:00Z'),
+      previousEnd: new Date('2026-10-01T00:00:00Z'),
+    });
+    expect(
+      resolveAnalyticsPeriod(
+        { start: '2026-10-01', end: '2026-10-10', comparison: 'yearAgo' },
+        now
+      )
+    ).toMatchObject({
+      days: 10,
+      comparison: 'yearAgo',
+      previousStart: new Date('2025-10-01T00:00:00Z'),
+      previousEnd: new Date('2025-10-11T00:00:00Z'),
+    });
+    expect(() =>
+      resolveAnalyticsPeriod({ start: '2026-10-01', end: '2026-10-27' }, now)
+    ).toThrow(/complete UTC days/);
+    expect(() =>
+      resolveAnalyticsPeriod({ start: '2025-01-01', end: '2026-01-02' }, now)
+    ).toThrow(/366/);
   });
 
   it('zero fills sparse periods without inventing comparisons or status', async () => {
@@ -256,6 +292,95 @@ describe('Admin analytics data contract', () => {
   });
 });
 
+describe('Analytics segment scopes', () => {
+  it('reconciles plan/type metrics and drill-downs while keeping live operations global', async () => {
+    const free = await consumer('free-segment@example.test');
+    const pro = await consumer('pro-segment@example.test', current, {
+      plan: PlanSlug.Pro,
+    });
+    const olderPro = await consumer('older-pro@example.test', prior, {
+      plan: PlanSlug.Pro,
+    });
+    await expense(free);
+    const firstIncome = await expense(pro);
+    const secondIncome = await expense(pro);
+    const previousIncome = await expense(pro, prior);
+    await Category.updateMany(
+      {
+        _id: {
+          $in: [
+            firstIncome.category,
+            secondIncome.category,
+            previousIncome.category,
+          ],
+        },
+      },
+      { $set: { type: 'income' } }
+    );
+    await expense(olderPro);
+    await expense(olderPro, current, { category: new Types.ObjectId() });
+    await SyncOperation.create({
+      id: 'global-error',
+      user: free._id,
+      type: 'CREATE',
+      entityType: 'expense',
+      entityId: '1',
+      data: {},
+      status: 'error',
+    });
+    const filters = { plan: PlanSlug.Pro, type: 'income' as const };
+    const data = await service.overview(7, now, filters);
+    expect(data.filters).toEqual(filters);
+    expect(data.metrics.expenses).toEqual({
+      current: 2,
+      previous: 1,
+      changePercent: 100,
+    });
+    expect(data.metrics.recordingUsers.current).toBe(1);
+    expect(data.metrics.newUsers.current).toBe(1);
+    expect(data.totalUsers).toBe(2);
+    expect(data.categories).toEqual([{ title: 'Food', count: 2, share: 100 }]);
+    expect(data.operations.failedOperations.count).toBe(1);
+    for (const kind of ['expenses', 'recordingUsers', 'newUsers'] as const) {
+      const rows = await service.records(
+        kind,
+        7,
+        undefined,
+        1,
+        now,
+        '2026-10-27',
+        filters
+      );
+      expect(rows.total).toBe(data.metrics[kind].current);
+      expect(rows.rows.every((row: any) => row.subtitle === pro.email)).toBe(
+        true
+      );
+    }
+    const outcome = await service.overview(7, now, {
+      plan: PlanSlug.Pro,
+      type: 'outcome',
+    });
+    expect(outcome.metrics.expenses.current).toBe(1);
+    expect(outcome.metrics.newUsers.current).toBe(1);
+    expect(
+      (await service.overview(7, now, { plan: PlanSlug.Pro })).metrics.expenses
+        .current
+    ).toBe(4);
+  });
+
+  it('returns truthful empty segments with zero-filled time series', async () => {
+    await expense(await consumer('only-free@example.test'));
+    const data = await service.overview(7, now, {
+      plan: PlanSlug.Premium,
+      type: 'income',
+    });
+    expect(data.totalUsers).toBe(0);
+    expect(data.metrics.expenses.current).toBe(0);
+    expect(data.series.every((row) => row.current.expenses === 0)).toBe(true);
+    expect(data.categories).toEqual([]);
+  });
+});
+
 describe('Admin analytics HTTP boundary', () => {
   const app = express();
   app.use('/v1/admin', adminRoutes);
@@ -308,5 +433,62 @@ describe('Admin analytics HTTP boundary', () => {
     expect(
       (await get('/v1/admin/analytics/records?kind=newUsers')).body.data.rows
     ).toEqual([]);
+  });
+  it('keeps assigned-plan filtering behind the existing Admin role boundary', async () => {
+    const appGet = async (role: string, path: string) => {
+      const user = await consumer(role + '-plan-filter@example.test', current, {
+        role,
+      });
+      await user.createSession();
+      const token = await (await User.findById(
+        user._id
+      ))!.generateAccessAuthToken();
+      return request(app).get(path).auth(token, { type: 'bearer' });
+    };
+    expect(
+      (await appGet('moderator', '/v1/admin/analytics?days=7&plan=pro')).status
+    ).toBe(403);
+    const moderator = await User.findOne({
+      email: 'moderator-plan-filter@example.test',
+    });
+    const token = await moderator!.generateAccessAuthToken();
+    expect(
+      (
+        await request(app)
+          .get('/v1/admin/analytics/records?kind=expenses&plan=pro')
+          .auth(token, { type: 'bearer' })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .get('/v1/admin/analytics?days=7&type=income')
+          .auth(token, { type: 'bearer' })
+      ).status
+    ).toBe(200);
+    const response = await appGet(
+      'admin',
+      '/v1/admin/analytics?days=7&plan=pro&type=income'
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.data.filters).toEqual({ plan: 'pro', type: 'income' });
+    const admin = await User.findOne({
+      email: 'admin-plan-filter@example.test',
+    });
+    const adminToken = await admin!.generateAccessAuthToken();
+    for (const query of [
+      'plan=unknown',
+      'plan=pro&plan=free',
+      'type=invalid',
+      'type[$ne]=income',
+    ]) {
+      expect(
+        (
+          await request(app)
+            .get('/v1/admin/analytics?' + query)
+            .auth(adminToken, { type: 'bearer' })
+        ).status
+      ).toBe(400);
+    }
   });
 });

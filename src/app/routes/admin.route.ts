@@ -16,6 +16,16 @@ const router = Router();
 router.use(verifyAccessToken);
 
 // ==================== DASHBOARD STATS (Moderator+) ====================
+router.get(
+  '/analytics/engagement',
+  requireModerator,
+  adminAnalyticsController.engagement
+);
+router.get(
+  '/analytics/subscriptions',
+  requireAdmin,
+  adminAnalyticsController.subscriptions
+);
 // Plan assignments already require Admin. Filtering must not bypass that boundary.
 const requireAnalyticsPlanAccess = (
   req: Request,
