@@ -23,8 +23,8 @@ function collect(items) {
 collect(collection.item);
 
 assert.equal(spec.openapi, '3.0.3');
-assert.equal(Object.keys(spec.paths).length, 118, 'mounted route paths changed');
-assert.equal(operations.length, 139, 'mounted route operations changed');
+assert.equal(Object.keys(spec.paths).length, 122, 'mounted route paths changed');
+assert.equal(operations.length, 143, 'mounted route operations changed');
 assert.equal(requests.length, operations.length, 'collection request count differs from spec');
 
 const routeKey = (request) => {
@@ -51,7 +51,30 @@ const analyticsContracts = {
   'GET /admin/analytics/subscriptions': 'SubscriptionAnalyticsEnvelope',
   'GET /admin/analytics/records': 'AnalyticsRecordsEnvelope',
 };
-for (const [key, schema] of Object.entries(analyticsContracts)) {
+const analyticsReportContracts = {
+  'GET /admin/analytics/reports': 'AnalyticsReportScheduleListEnvelope',
+  'POST /admin/analytics/reports': 'AnalyticsReportScheduleEnvelope',
+  'PUT /admin/analytics/reports/{id}': 'AnalyticsReportScheduleEnvelope',
+  'PATCH /admin/analytics/reports/{id}/status': 'AnalyticsReportScheduleEnvelope',
+  'DELETE /admin/analytics/reports/{id}': 'AnalyticsReportScheduleCancelEnvelope',
+};
+const detailedContracts = { ...analyticsContracts, ...analyticsReportContracts };
+const sessionContracts = {
+  'GET /user/sessions': 'UserSessionListEnvelope',
+  'DELETE /user/sessions/others': 'UserSessionMutationEnvelope',
+  'DELETE /user/sessions/{sessionId}': 'UserSessionMutationEnvelope',
+  'GET /user/csrf-token': 'CsrfTokenEnvelope',
+};
+for (const [key, schema] of Object.entries(sessionContracts)) {
+  const operation = operations.find(([operationKey]) => operationKey === key)?.[1];
+  assert.equal(
+    operation?.responses?.['200']?.content?.['application/json']?.schema?.$ref,
+    `#/components/schemas/${schema}`,
+    `source-reviewed response schema missing for ${key}`
+  );
+  if (key.startsWith('DELETE ')) assert(operation.security?.some((item) => item.bearerAuth), `${key} must require bearer auth`);
+}
+for (const [key, schema] of Object.entries(detailedContracts)) {
   const operation = operations.find(([operationKey]) => operationKey === key)?.[1];
   assert.equal(
     operation?.responses?.['200']?.content?.['application/json']?.schema?.$ref,
@@ -60,9 +83,9 @@ for (const [key, schema] of Object.entries(analyticsContracts)) {
   );
 }
 const testedAnalytics = requests.filter((item) =>
-  Object.keys(analyticsContracts).includes(routeKey(item.request))
+  Object.keys(detailedContracts).includes(routeKey(item.request))
 );
-assert.equal(testedAnalytics.length, Object.keys(analyticsContracts).length);
+assert.equal(testedAnalytics.length, Object.keys(detailedContracts).length);
 for (const item of testedAnalytics) {
   assert(
     item.event?.some((event) => event.listen === 'test' && event.script?.exec?.length >= 3),
@@ -98,4 +121,4 @@ for (const file of ['postman/openapi.json', 'postman/collection.json', 'postman/
   assert(!fs.readFileSync(path.join(root, file), 'utf8').includes('SecurePass123!'), `credential-like sample found in ${file}`);
 }
 
-console.log(JSON.stringify({ paths: Object.keys(spec.paths).length, operations: operations.length, requests: requests.length, analyticsSchemas: Object.keys(analyticsContracts).length, schemaRefs: refs.size }, null, 2));
+console.log(JSON.stringify({ paths: Object.keys(spec.paths).length, operations: operations.length, requests: requests.length, detailedAnalyticsContracts: Object.keys(detailedContracts).length, schemaRefs: refs.size }, null, 2));

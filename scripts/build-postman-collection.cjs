@@ -6,6 +6,53 @@ const spec = JSON.parse(fs.readFileSync(path.join(root, 'postman/openapi.json'),
 const verbs = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']);
 const folders = new Map();
 const analyticsAssertions = {
+  'POST /push/devices': [
+    'const body = pm.response.json();',
+    "pm.test('push token registration returns the success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
+  ],
+  'GET /user/sessions': [
+    'const body = pm.response.json();',
+    "pm.test('session list returns the authenticated user session envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); pm.expect(body.data.sessions).to.be.an('array'); });",
+    "pm.test('session summaries expose accurate activity time without refresh credentials', () => { for (const session of body.data.sessions) { pm.expect(session).to.include.keys('id', 'platform', 'lastAuthenticatedAt', 'expiresAt', 'current'); pm.expect(Object.keys(session).some((key) => ['token', 'refreshToken', 'tokenHash'].includes(key))).to.eql(false); } });",
+  ],
+  'DELETE /user/sessions/others': [
+    'const body = pm.response.json();',
+    "pm.test('other-session revocation succeeds without ending this session', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); pm.expect(body.data.revoked).to.be.a('boolean'); });",
+  ],
+  'DELETE /user/sessions/{sessionId}': [
+    'const body = pm.response.json();',
+    "pm.test('single-session revocation returns a typed outcome', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); pm.expect(body.data.revoked).to.be.a('boolean'); });",
+  ],
+  'GET /user/csrf-token': [
+    'const body = pm.response.json();',
+    "pm.test('CSRF bootstrap returns a usable token', () => { pm.response.to.have.status(200); pm.expect(body.csrfToken).to.be.a('string').and.not.empty; });",
+    "pm.environment.set('csrfToken', body.csrfToken);",
+  ],
+  'GET /admin/analytics/reports': [
+    "const body = pm.response.json();",
+    "pm.test('report schedule list returns an Admin success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
+    "pm.test('report schedule list exposes verified-recipient readiness and active capacity', () => { pm.expect(body.data.schedules).to.be.an('array'); pm.expect(body.data.emailVerified).to.be.a('boolean'); pm.expect(body.data.recipientEmail === null || typeof body.data.recipientEmail === 'string').to.eql(true); pm.expect(body.data.maxActiveSchedules).to.eql(5); });",
+  ],
+  'POST /admin/analytics/reports': [
+    "const body = pm.response.json();",
+    "pm.test('report schedule creation returns an Admin success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
+    "pm.test('new report schedule has an active next run and safe delivery state', () => { pm.expect(body.data.id).to.be.a('string'); pm.expect(body.data.active).to.eql(true); pm.expect(body.data.lastDeliveryStatus).to.eql('scheduled'); pm.expect(Date.parse(body.data.nextRunAt)).not.to.be.NaN; });",
+  ],
+  'PUT /admin/analytics/reports/{id}': [
+    "const body = pm.response.json();",
+    "pm.test('report schedule replacement returns an Admin success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
+    "pm.test('updated report schedule preserves ownership shape and next run', () => { pm.expect(body.data.id).to.be.a('string'); pm.expect(body.data.filters).to.include.keys('plan', 'type'); pm.expect(Date.parse(body.data.nextRunAt)).not.to.be.NaN; });",
+  ],
+  'PATCH /admin/analytics/reports/{id}/status': [
+    "const body = pm.response.json();",
+    "pm.test('report schedule status change returns an Admin success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
+    "pm.test('paused and active states agree with the delivery status', () => { pm.expect(body.data.active).to.be.a('boolean'); pm.expect(body.data.lastDeliveryStatus).to.eql(body.data.active ? 'scheduled' : 'paused'); });",
+  ],
+  'DELETE /admin/analytics/reports/{id}': [
+    "const body = pm.response.json();",
+    "pm.test('report schedule cancellation returns an Admin success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
+    "pm.test('successful cancellation returns a null data payload', () => { pm.expect(body.data).to.eql(null); });",
+  ],
   'GET /admin/analytics': [
     "const body = pm.response.json();",
     "pm.test('analytics overview returns a success envelope', () => { pm.response.to.have.status(200); pm.expect(body.success).to.eql(true); });",
@@ -87,6 +134,12 @@ for (const [route, pathItem] of Object.entries(spec.paths)) {
     const usesBearer = operation.security?.some((security) => security.bearerAuth) || false;
     const usesCookie = operation.security?.some((security) => security.cookieAuth) || false;
     const headers = body && body.mode !== 'formdata' ? [{ key: 'Content-Type', value: body.mime }] : [];
+    if (['/user/login', '/user/signup', '/user/auth/google/exchange', '/user/refresh-token', '/user/logout'].includes(route)) {
+      headers.push({ key: 'X-Auth-Transport', value: 'cookie' }, { key: 'X-Auth-Cookie-Path', value: '/v1/user' });
+    }
+    if (['/user/refresh-token', '/user/logout'].includes(route)) {
+      headers.push({ key: 'X-CSRF-Token', value: '{{csrfToken}}' });
+    }
     if (usesCookie) headers.push({ key: 'Cookie', value: 'refreshToken={{refreshToken}}' });
     const request = {
       method: method.toUpperCase(),

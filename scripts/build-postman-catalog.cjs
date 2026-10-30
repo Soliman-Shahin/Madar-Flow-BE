@@ -160,10 +160,12 @@ const jsonRequest = (properties, required = [], example) => ({
 });
 const requestContracts = {
   'POST /user/refresh-token': {
-    body: jsonRequest({ refreshToken: string('Refresh token returned by signup/login/refresh.', { example: '{{refreshToken}}' }) }, ['refreshToken'], { refreshToken: '{{refreshToken}}' }),
+    body: { ...jsonRequest({ refreshToken: string('Required for native/body auth. Omit when using the browser HttpOnly refresh cookie.', { example: '{{refreshToken}}' }) }, ['refreshToken'], { refreshToken: '{{refreshToken}}' }), required: false },
+    note: 'Browser cookie requests must first fetch GET /user/csrf-token and send X-CSRF-Token; native clients continue to send the refresh token in the encrypted body.',
   },
   'POST /user/logout': {
-    body: jsonRequest({ refreshToken: string('Refresh token to revoke.', { example: '{{refreshToken}}' }) }, ['refreshToken'], { refreshToken: '{{refreshToken}}' }),
+    body: { ...jsonRequest({ refreshToken: string('Required for native/body logout. Omit when revoking the browser HttpOnly refresh cookie.', { example: '{{refreshToken}}' }) }, ['refreshToken'], { refreshToken: '{{refreshToken}}' }), required: false },
+    note: 'Browser cookie requests must first fetch GET /user/csrf-token and send X-CSRF-Token. Native clients continue to send the refresh token in the encrypted body.',
   },
   'POST /user/auth/google/exchange': {
     body: jsonRequest({ code: string('Single-use 64-character hexadecimal exchange code returned by the OAuth callback.', { pattern: '^[a-f0-9]{64}$', example: '{{googleExchangeCode}}' }) }, ['code'], { code: '{{googleExchangeCode}}' }),
@@ -274,6 +276,18 @@ const requestContracts = {
   'PATCH /temporary-permissions/{id}/extend': {
     body: jsonRequest({ newEndDate: string('New expiry timestamp.', { format: 'date-time' }), reason: string('Optional reason.') }, ['newEndDate'], { newEndDate: '2026-11-01T00:00:00.000Z', reason: 'Local test' }),
   },
+  'POST /admin/analytics/reports': {
+    note: 'Creates a recurring email delivery to the signed-in Admin’s verified address. This request changes scheduled-job state; use a local/test workspace when exercising it.',
+  },
+  'PUT /admin/analytics/reports/{id}': {
+    note: 'Replaces the owned schedule and resets its retry/failure state. The schedule remains active or paused according to its current state.',
+  },
+  'PATCH /admin/analytics/reports/{id}/status': {
+    note: 'Pauses or resumes future report email delivery for the owned schedule.',
+  },
+  'DELETE /admin/analytics/reports/{id}': {
+    note: 'Soft-cancels the owned schedule and prevents future report delivery.',
+  },
   'POST /roles': {
     body: jsonRequest({ name: string('Role display name.', { minLength: 2, maxLength: 50 }), slug: string('Lowercase letters, digits, hyphens.', { pattern: '^[a-z0-9-]+$', minLength: 2, maxLength: 50 }), description: string('Optional description.'), permissions: { type: 'array', items: { type: 'string' } }, isSystem: boolean('Optional system-role marker.') }, ['name', 'slug'], { name: 'Local role', slug: 'local-role', description: 'Example only', permissions: [] }),
   },
@@ -288,7 +302,7 @@ const requestContracts = {
     body: jsonRequest({ sync: { type: 'object', properties: { inbox: boolean('Inbox channel.'), realtime: boolean('Realtime channel.'), push: boolean('Push channel.') } }, subscription: { type: 'object', properties: { inbox: boolean('Inbox channel.'), realtime: boolean('Realtime channel.'), push: boolean('Push channel.') } }, security: { type: 'object', properties: { inbox: boolean('Inbox channel.'), realtime: boolean('Realtime channel.'), push: boolean('Push channel.') } }, general: { type: 'object', properties: { inbox: boolean('Inbox channel.'), realtime: boolean('Realtime channel.'), push: boolean('Push channel.') } } }, [], { general: { inbox: true } }),
   },
   'POST /push/devices': {
-    body: jsonRequest({ deviceId: string('Stable device ID.', { minLength: 1, maxLength: 128 }), token: string('FCM/APNs token. Never store a real device token in a shared example.', { minLength: 20, maxLength: 4096, example: '{{pushToken}}' }), platform: string('Mobile platform.', { enum: ['android', 'ios'] }), appVersion: string('Optional app version.', { maxLength: 64 }) }, ['deviceId', 'token', 'platform'], { deviceId: '{{deviceId}}', token: '{{pushToken}}', platform: 'android', appVersion: '0.0.0-local' }),
+    body: jsonRequest({ deviceId: string('Stable device ID.', { minLength: 1, maxLength: 128 }), token: string('FCM registration token. Never store a real device token in a shared example.', { minLength: 20, maxLength: 4096, example: '{{pushToken}}' }), platform: string('Client platform.', { enum: ['android', 'ios', 'web'], example: '{{pushPlatform}}' }), appVersion: string('Optional app version.', { maxLength: 64 }) }, ['deviceId', 'token', 'platform'], { deviceId: '{{deviceId}}', token: '{{pushToken}}', platform: '{{pushPlatform}}', appVersion: '0.0.0-local' }),
   },
 };
 
@@ -425,6 +439,35 @@ const queryContracts = {
   ],
 };
 
+const headerContracts = {
+  'POST /user/login': [
+    { name: 'X-Auth-Transport', required: false, description: 'Set to cookie for browser clients; the refresh credential is then set as an HttpOnly cookie and omitted from the JSON response.', schema: string('Selects browser HttpOnly-cookie auth.', { enum: ['cookie'] }) },
+    { name: 'X-Auth-Cookie-Path', required: false, description: 'Allowlisted API prefix used to scope the refresh cookie.', schema: string('Cookie path; use the prefix matching the API base URL.', { enum: ['/v1/user', '/api/v1/user'] }) },
+    { name: 'X-Auth-Persistence', required: false, description: 'Choose session or persistent browser-cookie lifetime.', schema: string('Cookie persistence policy.', { enum: ['session', 'persistent'] }) },
+  ],
+  'POST /user/signup': [
+    { name: 'X-Auth-Transport', required: false, description: 'Set to cookie for browser clients; native clients omit this header.', schema: string('Selects browser HttpOnly-cookie auth.', { enum: ['cookie'] }) },
+    { name: 'X-Auth-Cookie-Path', required: false, description: 'Allowlisted API prefix used to scope the refresh cookie.', schema: string('Cookie path.', { enum: ['/v1/user', '/api/v1/user'] }) },
+  ],
+  'POST /user/auth/google/exchange': [
+    { name: 'X-Auth-Transport', required: false, description: 'Set to cookie for browser OAuth exchange.', schema: string('Selects browser HttpOnly-cookie auth.', { enum: ['cookie'] }) },
+    { name: 'X-Auth-Cookie-Path', required: false, description: 'Allowlisted API prefix used to scope the refresh cookie.', schema: string('Cookie path.', { enum: ['/v1/user', '/api/v1/user'] }) },
+  ],
+  'POST /user/refresh-token': [
+    { name: 'X-Auth-Transport', required: false, description: 'Set to cookie when rotating a browser refresh cookie.', schema: string('Selects browser HttpOnly-cookie auth.', { enum: ['cookie'] }) },
+    { name: 'X-Auth-Cookie-Path', required: false, description: 'Must match the path used when the cookie was set.', schema: string('Cookie path.', { enum: ['/v1/user', '/api/v1/user'] }) },
+    { name: 'X-CSRF-Token', required: false, description: 'Required for cookie-auth refresh; obtain from GET /user/csrf-token.', schema: string('CSRF token.', { example: '{{csrfToken}}' }) },
+  ],
+  'POST /user/logout': [
+    { name: 'X-Auth-Transport', required: false, description: 'Set to cookie when revoking a browser refresh cookie.', schema: string('Selects browser HttpOnly-cookie auth.', { enum: ['cookie'] }) },
+    { name: 'X-Auth-Cookie-Path', required: false, description: 'Must match the path used when the cookie was set.', schema: string('Cookie path.', { enum: ['/v1/user', '/api/v1/user'] }) },
+    { name: 'X-CSRF-Token', required: false, description: 'Required for cookie-auth logout; obtain from GET /user/csrf-token.', schema: string('CSRF token.', { example: '{{csrfToken}}' }) },
+  ],
+  'GET /user/csrf-token': [
+    { name: 'X-Auth-Cookie-Path', required: false, description: 'Selects the matching CSRF cookie path for the browser API prefix.', schema: string('Cookie path.', { enum: ['/v1/user', '/api/v1/user'] }) },
+  ],
+};
+
 const standardEnvelopeRouteFiles = new Set([
   'admin.route.ts',
   'audit-log.route.ts',
@@ -473,6 +516,61 @@ const responseRef = (description, schema) => ({
   content: { 'application/json': { schema: { $ref: `#/components/schemas/${schema}` } } },
 });
 const explicitResponseContracts = {
+  'GET /user/sessions': {
+    '200': responseRef('Active sessions for the authenticated account. Refresh-token hashes and credentials are never returned.', 'UserSessionListEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+  },
+  'DELETE /user/sessions/others': {
+    '200': responseRef('Revokes all sessions except the authenticated session.', 'UserSessionMutationEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+  },
+  'DELETE /user/sessions/{sessionId}': {
+    '200': responseRef('Revokes one session belonging to the authenticated account.', 'UserSessionMutationEnvelope'),
+    '400': responseRef('The current session must be ended through logout.', 'ApiErrorEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+  },
+  'GET /user/csrf-token': {
+    '200': responseRef('Issues a CSRF token and HttpOnly CSRF cookie for browser refresh/logout.', 'CsrfTokenEnvelope'),
+  },
+  'GET /admin/analytics/reports': {
+    '200': responseRef('Schedules owned by the authenticated Admin and verified-recipient readiness.', 'AnalyticsReportScheduleListEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+    '403': responseRef('Admin access is required.', 'ApiErrorEnvelope'),
+    '500': responseRef('Analytics report schedules could not be loaded.', 'ApiErrorEnvelope'),
+  },
+  'POST /admin/analytics/reports': {
+    '200': responseRef('The new active report schedule and next delivery time.', 'AnalyticsReportScheduleEnvelope'),
+    '400': responseRef('Schedule fields, frequency day, or IANA timezone are invalid.', 'ApiErrorEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+    '403': responseRef('Admin access is required.', 'ApiErrorEnvelope'),
+    '409': responseRef('The owner email is not verified, or the active schedule limit was reached.', 'ApiErrorEnvelope'),
+    '500': responseRef('The report schedule could not be created.', 'ApiErrorEnvelope'),
+  },
+  'PUT /admin/analytics/reports/{id}': {
+    '200': responseRef('The updated owned report schedule and next delivery time.', 'AnalyticsReportScheduleEnvelope'),
+    '400': responseRef('Schedule fields, frequency day, or IANA timezone are invalid.', 'ApiErrorEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+    '403': responseRef('Admin access is required.', 'ApiErrorEnvelope'),
+    '404': responseRef('The owned report schedule does not exist.', 'ApiErrorEnvelope'),
+    '409': responseRef('The owner email is not verified, or the active schedule limit was reached.', 'ApiErrorEnvelope'),
+    '500': responseRef('The report schedule could not be updated.', 'ApiErrorEnvelope'),
+  },
+  'PATCH /admin/analytics/reports/{id}/status': {
+    '200': responseRef('The paused or resumed owned report schedule.', 'AnalyticsReportScheduleEnvelope'),
+    '400': responseRef('The active field must be a boolean.', 'ApiErrorEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+    '403': responseRef('Admin access is required.', 'ApiErrorEnvelope'),
+    '404': responseRef('The owned report schedule does not exist.', 'ApiErrorEnvelope'),
+    '409': responseRef('The owner email is not verified, or the active schedule limit was reached.', 'ApiErrorEnvelope'),
+    '500': responseRef('The report schedule status could not be changed.', 'ApiErrorEnvelope'),
+  },
+  'DELETE /admin/analytics/reports/{id}': {
+    '200': responseRef('The schedule was soft-cancelled; no future delivery will be sent.', 'AnalyticsReportScheduleCancelEnvelope'),
+    '401': responseRef('Authentication is required.', 'ApiErrorEnvelope'),
+    '403': responseRef('Admin access is required.', 'ApiErrorEnvelope'),
+    '404': responseRef('The owned report schedule does not exist.', 'ApiErrorEnvelope'),
+    '500': responseRef('The report schedule could not be cancelled.', 'ApiErrorEnvelope'),
+  },
   'GET /admin/analytics': {
     '200': responseRef('Dashboard analytics overview and comparison series.', 'AdminAnalyticsOverviewEnvelope'),
     '400': responseRef('Analytics range or filters are invalid.', 'ApiErrorEnvelope'),
@@ -625,6 +723,29 @@ spec.components.schemas = {
     },
     example: { success: true, data: {}, message: 'Success' },
   },
+  UserSessionSummary: {
+    type: 'object', required: ['id', 'platform', 'expiresAt', 'current'],
+    properties: {
+      id: { type: 'string', description: 'Opaque session identifier; contains no credential material.' },
+      platform: { type: 'string', enum: ['web', 'android', 'ios'] },
+      createdAt: { type: 'string', format: 'date-time', nullable: true },
+      lastAuthenticatedAt: { type: 'string', format: 'date-time', nullable: true, description: 'Time of the most recent successful sign-in or refresh-token rotation, not background request activity.' },
+      expiresAt: { type: 'integer', description: 'Unix timestamp in seconds.' },
+      current: { type: 'boolean' },
+    },
+  },
+  UserSessionListEnvelope: {
+    type: 'object', required: ['success', 'data'],
+    properties: { success: { type: 'boolean', enum: [true] }, data: { type: 'object', required: ['sessions'], properties: { sessions: { type: 'array', items: { $ref: '#/components/schemas/UserSessionSummary' } } } } },
+  },
+  UserSessionMutationEnvelope: {
+    type: 'object', required: ['success', 'data'],
+    properties: { success: { type: 'boolean', enum: [true] }, data: { type: 'object', required: ['revoked'], properties: { revoked: { type: 'boolean' } } } },
+  },
+  CsrfTokenEnvelope: {
+    type: 'object', required: ['csrfToken'],
+    properties: { csrfToken: { type: 'string' } },
+  },
   AnalyticsPeriod: {
     type: 'object',
     required: ['days', 'timezone', 'start', 'endExclusive', 'generatedAt'],
@@ -742,11 +863,43 @@ spec.components.schemas = {
       start: { type: 'string', format: 'date-time' }, endExclusive: { type: 'string', format: 'date-time' }, filters: { $ref: '#/components/schemas/AnalyticsFilters' },
     },
   },
+  AnalyticsReportSchedule: {
+    type: 'object',
+    required: ['id', 'frequency', 'weekday', 'monthDay', 'hour', 'timezone', 'days', 'comparison', 'filters', 'language', 'active', 'nextRunAt', 'lastAttemptAt', 'lastSentAt', 'lastDeliveryStatus', 'lastErrorCode', 'consecutiveFailures', 'createdAt'],
+    properties: {
+      id: { type: 'string' }, frequency: { type: 'string', enum: ['weekly', 'monthly'] },
+      weekday: { type: 'integer', minimum: 1, maximum: 7, nullable: true },
+      monthDay: { type: 'integer', minimum: 1, maximum: 28, nullable: true },
+      hour: { type: 'integer', minimum: 0, maximum: 23 }, timezone: { type: 'string', maxLength: 80 },
+      days: { type: 'integer', enum: [7, 30, 90] }, comparison: { type: 'string', enum: ['previous', 'yearAgo'] },
+      filters: { type: 'object', required: ['plan', 'type'], properties: {
+        plan: { type: 'string', enum: ['free', 'pro', 'premium'], nullable: true },
+        type: { type: 'string', enum: ['income', 'outcome'], nullable: true },
+      } },
+      language: { type: 'string', enum: ['en', 'ar'] }, active: { type: 'boolean' },
+      nextRunAt: { type: 'string', format: 'date-time' }, lastAttemptAt: { type: 'string', format: 'date-time', nullable: true },
+      lastSentAt: { type: 'string', format: 'date-time', nullable: true },
+      lastDeliveryStatus: { type: 'string', enum: ['scheduled', 'sending', 'sent', 'failed', 'paused', 'cancelled'] },
+      lastErrorCode: { type: 'string', enum: ['RECIPIENT_UNAVAILABLE', 'DELIVERY_FAILED'], nullable: true },
+      consecutiveFailures: { type: 'integer', minimum: 0 }, createdAt: { type: 'string', format: 'date-time', nullable: true },
+    },
+  },
+  AnalyticsReportScheduleList: {
+    type: 'object', required: ['schedules', 'recipientEmail', 'emailVerified', 'maxActiveSchedules'],
+    properties: {
+      schedules: { type: 'array', items: { $ref: '#/components/schemas/AnalyticsReportSchedule' } },
+      recipientEmail: { type: 'string', format: 'email', nullable: true }, emailVerified: { type: 'boolean' },
+      maxActiveSchedules: { type: 'integer', enum: [5] },
+    },
+  },
   AdminAnalyticsOverviewEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/AdminAnalyticsOverview' }, message: { type: 'string' } } },
   AnalyticsFunnelEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/AnalyticsFunnel' }, message: { type: 'string' } } },
   EngagementAnalyticsEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/EngagementAnalytics' }, message: { type: 'string' } } },
   SubscriptionAnalyticsEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/SubscriptionAnalytics' }, message: { type: 'string' } } },
   AnalyticsRecordsEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/AnalyticsRecords' }, message: { type: 'string' } } },
+  AnalyticsReportScheduleListEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/AnalyticsReportScheduleList' }, message: { type: 'string' } } },
+  AnalyticsReportScheduleEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { $ref: '#/components/schemas/AnalyticsReportSchedule' }, message: { type: 'string' } } },
+  AnalyticsReportScheduleCancelEnvelope: { type: 'object', required: ['success', 'data', 'message'], properties: { success: { type: 'boolean', enum: [true] }, data: { nullable: true, description: 'Always null after a successful cancellation.' }, message: { type: 'string' } } },
   ApiErrorEnvelope: {
     type: 'object',
     required: ['success', 'error'],
@@ -1045,6 +1198,11 @@ for (const operation of routeOperations) {
     };
   }
   const reviewedQuery = (queryContracts[`${operation.method.toUpperCase()} ${pathKey}`] || []).length > 0;
+  const reviewedHeaders = headerContracts[`${operation.method.toUpperCase()} ${pathKey}`] || [];
+  const contractParameters = [
+    ...(queryContracts[`${operation.method.toUpperCase()} ${pathKey}`] || []).map((parameter) => ({ in: 'query', ...parameter })),
+    ...reviewedHeaders.map((parameter) => ({ in: 'header', ...parameter })),
+  ].filter((parameter) => !allParams.some((item) => item.in === parameter.in && item.name === parameter.name));
   const coverage = requestBody || reviewedQuery ? 'source-reviewed-input-schema' : 'route-and-access-only';
   const sourceDetails = [
     `Source route: ${operation.file}`,
@@ -1052,7 +1210,7 @@ for (const operation of routeOperations) {
     accessLabel ? `Required access: ${accessLabel}.` : '',
     operation.routeNotes.length ? `Route notes: ${operation.routeNotes.join(' · ')}.` : '',
     contract?.note || '',
-    coverage === 'route-and-access-only'
+    coverage === 'route-and-access-only' && !explicitResponseContracts[routeKey]
       ? 'Request and response schemas are not fully described in the current API spec. This operation is cataloged from its route and middleware; confirm the controller/validator contract before sending a mutation.'
       : '',
   ].filter(Boolean).join('\n\n');
@@ -1063,18 +1221,8 @@ for (const operation of routeOperations) {
     tags: original.tags || [operation.tag],
     summary: original.summary || operation.summary,
     description: detail,
-    parameters: [
-      ...allParams,
-      ...(queryContracts[`${operation.method.toUpperCase()} ${pathKey}`] || []).map((parameter) => ({
-        in: 'query',
-        ...parameter,
-      })).filter((parameter) => !allParams.some((item) => item.in === parameter.in && item.name === parameter.name)),
-    ].length
-      ? [
-          ...allParams,
-          ...(queryContracts[`${operation.method.toUpperCase()} ${pathKey}`] || []).map((parameter) => ({ in: 'query', ...parameter }))
-            .filter((parameter) => !allParams.some((item) => item.in === parameter.in && item.name === parameter.name)),
-        ]
+    parameters: [...allParams, ...contractParameters].length
+      ? [...allParams, ...contractParameters]
       : undefined,
     requestBody,
     security:
@@ -1089,6 +1237,7 @@ for (const operation of routeOperations) {
     'x-source-route': operation.file,
     ...(operation.hasBody ? { 'x-request-body-contract': contract?.body ? 'source-reviewed' : original.requestBody ? 'swagger-annotated' : 'not-yet-documented' } : {}),
     ...(reviewedQuery ? { 'x-query-contract': 'source-reviewed' } : {}),
+    ...(reviewedHeaders.length ? { 'x-header-contract': 'source-reviewed' } : {}),
     'x-response-contract-completeness': responseCoverage,
     ...(contract?.note ? { 'x-side-effect-note': contract.note } : {}),
   };
