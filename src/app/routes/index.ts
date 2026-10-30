@@ -23,7 +23,6 @@ import { billingRoutes, billingAdminRoutes } from './billing.route';
 import {
   trackSyncOperation,
   validateSyncData,
-  rateLimitSync,
   addSyncHeaders,
 } from '../middleware/sync.middleware';
 
@@ -42,7 +41,6 @@ router.use(
   '/sync',
   trackSyncOperation,
   validateSyncData,
-  rateLimitSync(100, 15 * 60 * 1000),
   addSyncHeaders,
   syncRoutes
 );
