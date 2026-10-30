@@ -70,8 +70,6 @@ const PlanSchema = new Schema<IPlan>(
   { timestamps: true }
 );
 
-// Index for fast plan lookup by slug
-PlanSchema.index({ slug: 1 }, { unique: true });
 // Index for ordering in UI
 PlanSchema.index({ order: 1, isActive: 1 });
 

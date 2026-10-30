@@ -243,7 +243,7 @@ export class ExpenseService {
         _lastModified: new Date(),
         _version: currentVersion + 1,
       },
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     ).populate('category');
 
     await this.notifyAndAudit({
@@ -273,7 +273,7 @@ export class ExpenseService {
         _syncStatus: 'synced',
         _lastModified: new Date(),
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     await this.notifyAndAudit({

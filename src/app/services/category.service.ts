@@ -149,7 +149,7 @@ export class CategoryService {
         _lastModified: new Date(),
         _version: currentVersion + 1,
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     this.clearUserCategoryCache(userId);
 
@@ -190,7 +190,7 @@ export class CategoryService {
         _syncStatus: 'synced',
         _lastModified: new Date(),
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
     this.clearUserCategoryCache(userId);
 

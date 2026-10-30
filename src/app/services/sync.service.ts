@@ -387,14 +387,14 @@ export class SyncService {
             },
             $inc: { attemptCount: 1 },
           },
-          { upsert: true, new: true }
+          { upsert: true, returnDocument: 'after' }
         ).lean();
       } catch (error: any) {
         if (error?.code === 11000) {
           failure = await SyncFailure.findOneAndUpdate(
             { ...identityFilter, terminal: false },
             { $inc: { attemptCount: 1 } },
-            { new: true }
+            { returnDocument: 'after' }
           ).lean();
         } else {
           throw error;
@@ -407,7 +407,7 @@ export class SyncService {
       const terminal = await SyncFailure.findOneAndUpdate(
         { _id: failure._id, terminal: false, dispatchState: 'pending' },
         { $set: { terminal: true, dispatchState: 'dispatching' } },
-        { new: true }
+        { returnDocument: 'after' }
       ).lean();
       if (!terminal) return;
 
@@ -425,7 +425,7 @@ export class SyncService {
     const claimed = await SyncFailure.findOneAndUpdate(
       { _id: failure._id, terminal: false, dispatchState: 'pending' },
       { $set: { terminal: true, dispatchState: 'dispatching' } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
     const dispatching = claimed || failure;
     try {
@@ -484,7 +484,7 @@ export class SyncService {
       return await SyncRegistration.findOneAndUpdate(
         { user: userObjectId, clientOperationId: operationId },
         { $setOnInsert: { receiptId: randomUUID(), user: userObjectId, clientOperationId: operationId, operationType, entityType, entityId, baseVersion: entity._baseVersion, fingerprint, state: 'registered' } },
-        { upsert: true, new: true }
+        { upsert: true, returnDocument: 'after' }
       ).lean();
     } catch (error: any) {
       if (error?.code === 11000) {
@@ -542,7 +542,7 @@ export class SyncService {
             detectedAt: new Date(),
           },
         },
-        { upsert: true, new: false }
+        { upsert: true, returnDocument: 'before' }
       ).lean();
     } catch (error: any) {
       if (error?.code === 11000) {
@@ -936,7 +936,7 @@ export class SyncService {
           ],
         },
         { $set: { resolutionState: 'resolving', claimedResolution: resolution } },
-        { new: true }
+        { returnDocument: 'after' }
       ).lean();
       if (!claimed) throw new Error('Conflict already claimed with a different choice');
       const entity = await Model.findOne({ _id: entityId, user: userObjectId });
