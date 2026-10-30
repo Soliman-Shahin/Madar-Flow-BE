@@ -414,7 +414,8 @@ describe('Insights HTTP permissions and validation', () => {
       'engagement?days[$gt]=1',
       'engagement?start=2026-10-01',
       'engagement?days=7&start=2026-10-01&end=2026-10-07',
-      'engagement?start=2026-10-01&end=2026-10-27',
+      // End date is today (UTC), so the final day is still incomplete.
+      `engagement?start=${new Date(Date.now() - 9 * 86_400_000).toISOString().slice(0, 10)}&end=${new Date().toISOString().slice(0, 10)}`,
       'subscriptions?horizon=90',
       'subscriptions?page=0',
       'subscriptions?page=1.5',
