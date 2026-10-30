@@ -13,7 +13,11 @@ import {
 import { NotFoundError, BadRequestError } from '../shared/errors';
 import logger from '../services/logger.service';
 import { permissionCacheService } from '../services/permission-cache.service';
-import { selfServiceUpgradeEnabled } from '../config/billing.config';
+import {
+  revenueCatAndroidPublicKey,
+  selfServiceUpgradeEnabled,
+  storePurchasesAvailable,
+} from '../config/billing.config';
 
 /**
  * Plan Controller
@@ -101,7 +105,15 @@ export class PlanController {
           usage: usageStats,
           subscriptionHistory: subscriptions,
           // Lets the app hide the upgrade button instead of failing on tap.
-          upgradeAvailable: selfServiceUpgradeEnabled(),
+          upgradeAvailable:
+            selfServiceUpgradeEnabled() || storePurchasesAvailable(),
+          // Store purchases go through RevenueCat. The key is public by design.
+          billing: storePurchasesAvailable()
+            ? {
+                provider: 'revenuecat',
+                androidPublicKey: revenueCatAndroidPublicKey(),
+              }
+            : null,
         },
         'Plan details retrieved successfully'
       );
@@ -220,6 +232,7 @@ export class PlanController {
     next: NextFunction
   ): Promise<void> {
     try {
+      await this.assertProductIdsFree(req.body?.productIds, undefined);
       const plan = await Plan.create(req.body);
       logger.info(`Admin created plan: ${plan.slug}`);
       sendSuccess(res, plan, 'Plan created successfully', 201);
@@ -238,6 +251,10 @@ export class PlanController {
     next: NextFunction
   ): Promise<void> {
     try {
+      await this.assertProductIdsFree(
+        req.body?.productIds,
+        req.params.id as string
+      );
       const plan = await Plan.findByIdAndUpdate(req.params.id, req.body, {
         returnDocument: 'after',
         runValidators: true,
@@ -247,6 +264,33 @@ export class PlanController {
       sendSuccess(res, plan, 'Plan updated successfully');
     } catch (error) {
       next(error);
+    }
+  }
+
+  /** A store product can grant only one plan; reject ids another plan owns. */
+  private async assertProductIdsFree(
+    productIds: unknown,
+    exceptPlanId: string | undefined
+  ): Promise<void> {
+    if (productIds === undefined) return;
+    if (
+      !Array.isArray(productIds) ||
+      productIds.some((id) => typeof id !== 'string' || !id.trim())
+    ) {
+      throw new BadRequestError('productIds must be a list of product ids');
+    }
+    const ids = productIds.map((id: string) => id.trim());
+    if (new Set(ids).size !== ids.length) {
+      throw new BadRequestError('productIds contains duplicates');
+    }
+    const clash = await Plan.findOne({
+      productIds: { $in: ids },
+      ...(exceptPlanId ? { _id: { $ne: exceptPlanId } } : {}),
+    }).lean();
+    if (clash) {
+      throw new BadRequestError(
+        `A store product is already used by the ${clash.slug} plan`
+      );
     }
   }
 

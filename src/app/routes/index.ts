@@ -19,6 +19,7 @@ import {
   appSettingsAdminRoutes,
 } from './app-settings.route';
 import { telemetryRoutes, telemetryAdminRoutes } from './telemetry.route';
+import { billingRoutes, billingAdminRoutes } from './billing.route';
 import {
   trackSyncOperation,
   validateSyncData,
@@ -34,6 +35,7 @@ router.use('/expenses', expenseRoutes);
 router.use('/plans', planRoutes);
 router.use('/app-settings', appSettingsPublicRoutes);
 router.use('/telemetry', telemetryRoutes);
+router.use('/billing', billingRoutes);
 
 // Sync middleware scoped to /sync routes only
 router.use(
@@ -48,6 +50,7 @@ router.use(
 // Mounted before /admin so these paths resolve to the dedicated router.
 router.use('/admin/app-settings', appSettingsAdminRoutes);
 router.use('/admin/telemetry', telemetryAdminRoutes);
+router.use('/admin/billing', billingAdminRoutes);
 router.use('/admin', adminRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/cache', cacheRoutes);

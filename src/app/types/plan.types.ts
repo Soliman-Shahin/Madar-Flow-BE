@@ -29,6 +29,13 @@ export const PLAN_WEIGHTS: Record<PlanSlug, number> = {
   [PlanSlug.Premium]: 2,
 };
 
+/** A reference price in one currency. */
+export interface PlanPrice {
+  /** ISO 4217 code, upper case (for example "USD", "EGP") */
+  currency: string;
+  amount: number;
+}
+
 // ==================== Plan Limits ====================
 
 /**
@@ -77,6 +84,8 @@ export interface IPlanDefinition {
   price: number;
   currency: string;
   billingCycle: 'monthly' | 'yearly' | 'lifetime';
+  prices: PlanPrice[];
+  productIds: string[];
   limits: PlanLimits;
   features: Permission[];
   isActive: boolean;
