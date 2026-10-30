@@ -15,6 +15,10 @@ import roleRoutes from './role.routes';
 import notificationRoutes from './notification.route';
 import pushDeviceRoutes from './push-device.route';
 import {
+  appSettingsPublicRoutes,
+  appSettingsAdminRoutes,
+} from './app-settings.route';
+import {
   trackSyncOperation,
   validateSyncData,
   rateLimitSync,
@@ -27,6 +31,7 @@ router.use('/user', userRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/plans', planRoutes);
+router.use('/app-settings', appSettingsPublicRoutes);
 
 // Sync middleware scoped to /sync routes only
 router.use(
@@ -38,6 +43,8 @@ router.use(
   syncRoutes
 );
 
+// Mounted before /admin so these paths resolve to the dedicated router.
+router.use('/admin/app-settings', appSettingsAdminRoutes);
 router.use('/admin', adminRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/cache', cacheRoutes);
