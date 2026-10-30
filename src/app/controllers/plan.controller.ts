@@ -13,6 +13,7 @@ import {
 import { NotFoundError, BadRequestError } from '../shared/errors';
 import logger from '../services/logger.service';
 import { permissionCacheService } from '../services/permission-cache.service';
+import { selfServiceUpgradeEnabled } from '../config/billing.config';
 
 /**
  * Plan Controller
@@ -99,6 +100,8 @@ export class PlanController {
           context: planReq.planContext,
           usage: usageStats,
           subscriptionHistory: subscriptions,
+          // Lets the app hide the upgrade button instead of failing on tap.
+          upgradeAvailable: selfServiceUpgradeEnabled(),
         },
         'Plan details retrieved successfully'
       );
@@ -121,6 +124,18 @@ export class PlanController {
     next: NextFunction
   ): Promise<void> {
     try {
+      // Upgrades grant a paid plan with no payment check, so they stay closed
+      // until a payment provider is connected (see config/billing.config.ts).
+      if (!selfServiceUpgradeEnabled()) {
+        sendError(
+          res,
+          'Plan upgrades are not available yet.',
+          403,
+          'UPGRADE_NOT_AVAILABLE'
+        );
+        return;
+      }
+
       const authReq = req as AuthenticatedRequest;
       const userId = authReq.user_id!;
       const { planSlug, paymentRef } = req.body as UpgradePlanBody;
