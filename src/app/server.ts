@@ -13,6 +13,7 @@ import { notificationArchivalJob } from './jobs/notification-archival.job';
 import { sessionCleanupJob } from './jobs/session-cleanup.job';
 import { permissionExpiryJob } from './jobs/permission-expiry.job';
 import { auditLogRetentionJob } from './jobs/audit-log-retention.job';
+import { analyticsReportScheduleJob } from './jobs/analytics-report-schedule.job';
 
 const DEFAULT_PORT = 3000;
 
@@ -70,6 +71,7 @@ function registerGracefulShutdown(closeServer: () => Promise<void>): void {
       sessionCleanupJob.stop();
       permissionExpiryJob.stop();
       auditLogRetentionJob.stop();
+      analyticsReportScheduleJob.stop();
       await closeServer();
       await mongoose.connection.close();
       logger.info('[server]: Shutdown complete');
@@ -112,6 +114,7 @@ async function startServer() {
       sessionCleanupJob.start();
       permissionExpiryJob.start();
       auditLogRetentionJob.start();
+      analyticsReportScheduleJob.start();
     });
 
     registerGracefulShutdown(() => socketService.close());

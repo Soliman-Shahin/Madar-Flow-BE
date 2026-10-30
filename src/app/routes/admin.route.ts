@@ -9,6 +9,9 @@ import {
 } from '../middleware/admin.middleware';
 import { UserRole } from '../models/user.model';
 import { adminAnalyticsController } from '../controllers/admin-analytics.controller';
+import { analyticsReportScheduleController } from '../controllers/analytics-report-schedule.controller';
+import { auditRequest } from '../middleware/audit.middleware';
+import { AuditAction } from '../models/audit-log.model';
 
 const router = Router();
 
@@ -30,6 +33,138 @@ router.get(
   '/analytics/subscriptions',
   requireAdmin,
   adminAnalyticsController.subscriptions
+);
+/**
+ * @swagger
+ * /admin/analytics/reports:
+ *   get:
+ *     summary: List the current Admin's scheduled analytics reports
+ *     tags: [Analytics]
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Schedules, current verified recipient status, and active limit
+ *   post:
+ *     summary: Create a weekly or monthly analytics report sent to the current Admin's verified email
+ *     tags: [Analytics]
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [frequency, hour, timezone, days, comparison, language]
+ *             properties:
+ *               frequency: { type: string, enum: [weekly, monthly] }
+ *               weekday: { type: integer, minimum: 1, maximum: 7, description: ISO weekday, Monday=1 }
+ *               monthDay: { type: integer, minimum: 1, maximum: 28 }
+ *               hour: { type: integer, minimum: 0, maximum: 23, description: Local hour in timezone }
+ *               timezone: { type: string, example: Africa/Cairo }
+ *               days: { type: integer, enum: [7, 30, 90] }
+ *               comparison: { type: string, enum: [previous, yearAgo] }
+ *               plan: { type: string, enum: [free, pro, premium] }
+ *               type: { type: string, enum: [income, outcome] }
+ *               language: { type: string, enum: [en, ar] }
+ *     responses:
+ *       200:
+ *         description: Schedule created
+ *       409:
+ *         description: Email verification or schedule limit requirement not met
+ * /admin/analytics/reports/{id}:
+ *   put:
+ *     summary: Replace an owned report schedule
+ *     tags: [Analytics]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [frequency, hour, timezone, days, comparison, language]
+ *             properties:
+ *               frequency: { type: string, enum: [weekly, monthly] }
+ *               weekday: { type: integer, minimum: 1, maximum: 7 }
+ *               monthDay: { type: integer, minimum: 1, maximum: 28 }
+ *               hour: { type: integer, minimum: 0, maximum: 23 }
+ *               timezone: { type: string, maxLength: 80 }
+ *               days: { type: integer, enum: [7, 30, 90] }
+ *               comparison: { type: string, enum: [previous, yearAgo] }
+ *               plan: { type: string, enum: [free, pro, premium] }
+ *               type: { type: string, enum: [income, outcome] }
+ *               language: { type: string, enum: [en, ar] }
+ *     responses:
+ *       200: { description: Schedule updated }
+ *       404: { description: Owned schedule not found }
+ *   delete:
+ *     summary: Soft-cancel an owned report schedule
+ *     tags: [Analytics]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Schedule cancelled }
+ *       404: { description: Owned schedule not found }
+ * /admin/analytics/reports/{id}/status:
+ *   patch:
+ *     summary: Pause or resume an owned report schedule
+ *     tags: [Analytics]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [active]
+ *             properties:
+ *               active: { type: boolean }
+ *     responses:
+ *       200: { description: Schedule status updated }
+ *       404: { description: Owned schedule not found }
+ */
+router.get(
+  '/analytics/reports',
+  requireAdmin,
+  analyticsReportScheduleController.list
+);
+router.post(
+  '/analytics/reports',
+  requireAdmin,
+  auditRequest(AuditAction.ANALYTICS_REPORT_SCHEDULE_CREATED),
+  analyticsReportScheduleController.create
+);
+router.put(
+  '/analytics/reports/:id',
+  requireAdmin,
+  auditRequest(AuditAction.ANALYTICS_REPORT_SCHEDULE_UPDATED),
+  analyticsReportScheduleController.update
+);
+router.patch(
+  '/analytics/reports/:id/status',
+  requireAdmin,
+  auditRequest(AuditAction.ANALYTICS_REPORT_SCHEDULE_UPDATED),
+  analyticsReportScheduleController.setActive
+);
+router.delete(
+  '/analytics/reports/:id',
+  requireAdmin,
+  auditRequest(AuditAction.ANALYTICS_REPORT_SCHEDULE_CANCELLED),
+  analyticsReportScheduleController.cancel
 );
 // Plan assignments already require Admin. Filtering must not bypass that boundary.
 const requireAnalyticsPlanAccess = (
