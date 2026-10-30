@@ -1,4 +1,5 @@
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -14,6 +15,7 @@ import { verifyAccessToken } from '../middleware/access.middleware';
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 app.use(advancedEncryptionMiddleware);
 app.use('/v1/user', userRoutes);
 app.get('/v1/protected', verifyAccessToken, (req, res) =>
@@ -55,6 +57,40 @@ describe('AUTH.1 session contract', () => {
     expect(payload.exp! - payload.iat!).toBe(3600);
     expect(payload.sid).toBe(saved!.sessions[0].sessionId);
     expect(res.body.data.user.password).toBeUndefined();
+  });
+  it('browser login rotates refresh credentials through an HttpOnly cookie', async () => {
+    const user = await account();
+    const login = await request(app)
+      .post('/v1/user/login')
+      .set('X-Auth-Transport', 'cookie')
+      .set('X-Auth-Persistence', 'persistent')
+      .send({
+        data: encryptCryptoJS({
+          email: user.email,
+          password: 'Testing-Password-42!',
+        }),
+      });
+
+    expect(login.status).toBe(200);
+    expect(login.body.data.refreshToken).toBeUndefined();
+    expect(login.headers['refresh-token']).toBeUndefined();
+    const cookieHeaders: string[] = Array.isArray(login.headers['set-cookie'])
+      ? login.headers['set-cookie']
+      : [String(login.headers['set-cookie'] || '')];
+    const cookie = cookieHeaders.find((value) => value.startsWith('mf_refresh='));
+    expect(cookie).toContain('HttpOnly');
+    expect(cookie).toContain('Path=/v1/user');
+
+    const refresh = await request(app)
+      .post('/v1/user/refresh-token')
+      .set('X-Auth-Transport', 'cookie')
+      .set('Cookie', String(cookie).split(';')[0])
+      .send({ data: encryptCryptoJS({}) });
+    expect(refresh.status).toBe(200);
+    expect(refresh.body.data.refreshToken).toBeUndefined();
+    expect(refresh.body.data.accessToken).toEqual(expect.any(String));
+    expect(refresh.body.data.user._id).toBe(user._id.toString());
+    expect(refresh.headers['set-cookie']?.[0]).toContain('mf_refresh=');
   });
   it('native Google issues the same hashed format and preserves other sessions', async () => {
     const { user, token } = await session();
@@ -273,6 +309,36 @@ describe('AUTH.1 session contract', () => {
           .set('Authorization', `Bearer ${second.accessToken}`)
       ).status
     ).toBe(200);
+  });
+  it('lists safe active sessions and revokes only other devices on request', async () => {
+    const user = await account();
+    const current = await UserService.createAuthenticatedSession(user, 'password', 'ios');
+    const other = await UserService.createAuthenticatedSession(user, 'password', 'web');
+    const listed = await request(app)
+      .get('/v1/user/sessions')
+      .set('Authorization', `Bearer ${current.accessToken}`);
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.sessions).toHaveLength(2);
+    expect(listed.body.data.sessions.find((item: any) => item.current)).toMatchObject({ platform: 'ios', current: true });
+    expect(JSON.stringify(listed.body)).not.toContain(hash(current.refreshToken));
+    expect(JSON.stringify(listed.body)).not.toContain('refreshToken');
+
+    const revoked = await request(app)
+      .delete('/v1/user/sessions/others')
+      .set('Authorization', `Bearer ${current.accessToken}`);
+    expect(revoked.status).toBe(200);
+    expect(revoked.body.data.revoked).toBe(true);
+    expect(await UserService.rotateRefreshToken(current.refreshToken)).not.toBeNull();
+    expect(await UserService.rotateRefreshToken(other.refreshToken)).toBeNull();
+  });
+  it('does not let a session-management endpoint revoke the current session accidentally', async () => {
+    const user = await account();
+    const current = await UserService.createAuthenticatedSession(user, 'password');
+    const revoked = await request(app)
+      .delete(`/v1/user/sessions/${user.sessions[0]?.sessionId || (jwt.verify(current.accessToken, process.env.ACCESS_TOKEN_SECRET!) as any).sid}`)
+      .set('Authorization', `Bearer ${current.accessToken}`);
+    expect(revoked.status).toBe(400);
+    expect(await UserService.rotateRefreshToken(current.refreshToken)).not.toBeNull();
   });
   it('rejects access tokens whose persisted session has expired', async () => {
     const user = await account();

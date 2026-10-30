@@ -14,6 +14,7 @@ if (!ACCESS_TOKEN_SECRET) {
 // Export the interface so other files can use it
 export interface AuthenticatedRequest extends Request {
   user_id?: string;
+  sessionId?: string;
   user?: { _id: string; email?: string; role?: UserRole };
 }
 
@@ -93,6 +94,7 @@ export const verifyAccessToken = async (
 
     // Attach user id and user object to request for downstream use
     authReq.user_id = payload._id;
+    authReq.sessionId = payload.sid;
     authReq.user = {
       _id: payload._id,
       email: payload.email,

@@ -15,7 +15,7 @@ const configuredRefreshDays = parseInt(
   10
 );
 
-const REFRESH_TOKEN_EXPIRY_DAYS =
+export const REFRESH_TOKEN_EXPIRY_DAYS =
   Number.isFinite(configuredRefreshDays) && configuredRefreshDays > 0
     ? configuredRefreshDays
     : 10;
@@ -32,10 +32,11 @@ export class UserService {
       | 'password'
       | 'google_web'
       | 'google_native'
-      | 'biometric'
+      | 'biometric',
+    platform: 'web' | 'android' | 'ios' = 'web'
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const refreshToken = await this.generateRefreshToken();
-    const sessionId = await this.addRefreshToken(user, refreshToken);
+    const sessionId = await this.addRefreshToken(user, refreshToken, platform);
     const accessToken = await this.generateAccessToken(user, sessionId);
     const occurredAt = new Date().toISOString();
 
@@ -129,7 +130,8 @@ export class UserService {
   // Add a hashed refresh credential without replacing another device session
   static async addRefreshToken(
     user: UserDocument,
-    refreshToken: string
+    refreshToken: string,
+    platform: 'web' | 'android' | 'ios' = 'web'
   ): Promise<string> {
     const hashed = hashToken(refreshToken);
     const sessionId = this.generateSessionId();
@@ -148,7 +150,16 @@ export class UserService {
     const result = await User.updateOne(
       { _id: user._id, _isDeleted: { $ne: true }, isActive: { $ne: false } },
       {
-        $push: { sessions: { sessionId, token: hashed, expiresAt } },
+        $push: {
+          sessions: {
+            sessionId,
+            token: hashed,
+            expiresAt,
+            createdAt: new Date(),
+            lastAuthenticatedAt: new Date(),
+            platform,
+          },
+        },
       }
     );
     if (!result.matchedCount) throw new Error('Account unavailable');
@@ -225,6 +236,9 @@ export class UserService {
                           },
                           token: hashToken(nextToken),
                           expiresAt: now + REFRESH_TOKEN_EXPIRY_DAYS * 86400,
+                          createdAt: { $ifNull: ['$$session.createdAt', new Date(now * 1000)] },
+                          lastAuthenticatedAt: new Date(now * 1000),
+                          platform: { $ifNull: ['$$session.platform', 'web'] },
                         },
                       ],
                     },

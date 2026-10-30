@@ -105,6 +105,9 @@ interface IUserSession {
   sessionId?: string;
   token: string;
   expiresAt: number;
+  createdAt?: Date;
+  lastAuthenticatedAt?: Date;
+  platform?: 'web' | 'android' | 'ios';
 }
 
 interface UserDocument extends Document {
@@ -209,6 +212,9 @@ const UserSchema = new Schema<UserDocument>(
         sessionId: { type: String },
         token: { type: String, required: true },
         expiresAt: { type: Number, required: true },
+        createdAt: { type: Date, default: Date.now },
+        lastAuthenticatedAt: { type: Date, default: Date.now },
+        platform: { type: String, enum: ['web', 'android', 'ios'], default: 'web' },
       },
     ],
     passwordResetTokenHash: { type: String, select: false },

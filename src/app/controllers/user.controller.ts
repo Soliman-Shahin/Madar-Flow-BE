@@ -2,6 +2,11 @@ import { Response } from 'express';
 import { sendError, sendSuccess } from '../shared/helper';
 import { CustomRequest } from '../types/custom-request';
 import { UserService } from '../services/user.service';
+import {
+  clearRefreshCookie,
+  setRefreshCookie,
+  usesHttpOnlyRefreshCookie,
+} from '../services/refresh-cookie.service';
 import { User, Category } from '../models';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '../services/password-validation.service';
@@ -41,6 +46,11 @@ const SALT_ROUNDS =
   process.env.NODE_ENV === 'production'
     ? 12
     : Number(process.env.SALT_ROUNDS) || 10;
+
+const requestPlatform = (req: CustomRequest): 'web' | 'android' | 'ios' => {
+  const value = req.get('x-client-platform');
+  return value === 'android' || value === 'ios' ? value : 'web';
+};
 
 // POST /signup
 const signUp = async (req: CustomRequest, res: Response) => {
@@ -88,14 +98,25 @@ const signUp = async (req: CustomRequest, res: Response) => {
 
     // Generate tokens
     const refreshToken = await UserService.generateRefreshToken();
-    const sessionId = await UserService.addRefreshToken(user, refreshToken);
+    const sessionId = await UserService.addRefreshToken(
+      user,
+      refreshToken,
+      requestPlatform(req)
+    );
     const accessToken = await UserService.generateAccessToken(user, sessionId);
 
-    // Also return tokens in headers for legacy frontend compatibility
-    res.setHeader('access-token', accessToken);
-    res.setHeader('refresh-token', refreshToken);
+    const cookieAuth = usesHttpOnlyRefreshCookie(req);
+    if (cookieAuth) setRefreshCookie(req, res, refreshToken);
 
-    sendSuccess(res, { user, accessToken, refreshToken }, 'Signup successful');
+    // Also return tokens in headers for native and legacy client compatibility.
+    res.setHeader('access-token', accessToken);
+    if (!cookieAuth) res.setHeader('refresh-token', refreshToken);
+
+    sendSuccess(
+      res,
+      { user, accessToken, ...(!cookieAuth ? { refreshToken } : {}) },
+      'Signup successful'
+    );
   } catch (error: unknown) {
     const context = {
       ip: req.ip || req.socket.remoteAddress,
@@ -137,13 +158,24 @@ const login = async (req: CustomRequest, res: Response) => {
     });
 
     const { accessToken, refreshToken } =
-      await UserService.createAuthenticatedSession(user, 'password');
+      await UserService.createAuthenticatedSession(
+        user,
+        'password',
+        requestPlatform(req)
+      );
 
-    // Also return tokens in headers for legacy frontend compatibility
+    const cookieAuth = usesHttpOnlyRefreshCookie(req);
+    if (cookieAuth) setRefreshCookie(req, res, refreshToken);
+
+    // Also return tokens in headers for native and legacy client compatibility.
     res.setHeader('access-token', accessToken);
-    res.setHeader('refresh-token', refreshToken);
+    if (!cookieAuth) res.setHeader('refresh-token', refreshToken);
 
-    sendSuccess(res, { user, accessToken, refreshToken }, 'Login successful');
+    sendSuccess(
+      res,
+      { user, accessToken, ...(!cookieAuth ? { refreshToken } : {}) },
+      'Login successful'
+    );
   } catch (error: unknown) {
     // Record failed login attempt
     const email = req.body?.email;
@@ -209,20 +241,40 @@ const userAccessToken = async (req: CustomRequest, res: Response) => {
 // POST /refresh-token
 const refreshToken = async (req: CustomRequest, res: Response) => {
   try {
-    const credential = req.body?.refreshToken;
-    if (typeof credential !== 'string')
+    const cookieAuth = usesHttpOnlyRefreshCookie(req);
+    const credential = cookieAuth
+      ? req.cookies?.mf_refresh || req.body?.refreshToken
+      : req.body?.refreshToken;
+    if (typeof credential !== 'string') {
+      if (cookieAuth) clearRefreshCookie(req, res);
       return sendError(res, 'Refresh token required', 400);
+    }
     const tokens = await UserService.rotateRefreshToken(credential);
-    if (!tokens)
+    if (!tokens) {
+      if (cookieAuth) clearRefreshCookie(req, res);
       return sendError(
         res,
         'Invalid or expired session',
         401,
         'SESSION_INVALID'
       );
+    }
+    if (cookieAuth) setRefreshCookie(req, res, tokens.refreshToken);
     res.setHeader('access-token', tokens.accessToken);
-    res.setHeader('refresh-token', tokens.refreshToken);
-    return sendSuccess(res, tokens, 'Token refreshed successfully');
+    if (!cookieAuth) res.setHeader('refresh-token', tokens.refreshToken);
+    const cookieUser = cookieAuth
+      ? await UserService.findByRefreshToken(tokens.refreshToken)
+      : null;
+    const safeUser = cookieUser
+      ? (({ password, sessions, ...user }) => user)(cookieUser.toJSON())
+      : null;
+    return sendSuccess(
+      res,
+      cookieAuth
+        ? { accessToken: tokens.accessToken, user: safeUser }
+        : tokens,
+      'Token refreshed successfully'
+    );
   } catch {
     return sendError(res, 'Session renewal temporarily unavailable', 503);
   }
@@ -230,10 +282,16 @@ const refreshToken = async (req: CustomRequest, res: Response) => {
 
 const logout = async (req: CustomRequest, res: Response) => {
   try {
-    const credential = req.body?.refreshToken;
-    if (typeof credential !== 'string')
+    const cookieAuth = usesHttpOnlyRefreshCookie(req);
+    const credential = cookieAuth
+      ? req.cookies?.mf_refresh || req.body?.refreshToken
+      : req.body?.refreshToken;
+    if (typeof credential !== 'string') {
+      if (cookieAuth) clearRefreshCookie(req, res);
       return sendError(res, 'Refresh token required', 400);
+    }
     await UserService.revokeRefreshToken(credential);
+    if (cookieAuth) clearRefreshCookie(req, res);
     return sendSuccess(res, {}, 'Logged out');
   } catch {
     return sendError(res, 'Session revocation temporarily unavailable', 503);
