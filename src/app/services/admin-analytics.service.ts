@@ -162,6 +162,10 @@ export function resolveAnalyticsPeriod(
   };
 }
 
+function roundPercent(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
 export function compareMetric(current: number, previous: number) {
   return {
     current,
@@ -498,6 +502,115 @@ export class AdminAnalyticsService {
       start: start.toISOString(),
       endExclusive: end.toISOString(),
       filters: { plan: filters.plan || null, type: filters.type || null },
+    };
+  }
+
+  /**
+   * Activation funnel for consumer accounts.
+   *
+   * Stages are nested on purpose - every stage is a subset of the one before
+   * it, so the gaps between them are real drop-offs:
+   *   registered -> recorded at least one record -> recorded inside the
+   *   selected window -> recorded inside the window on a paid plan.
+   */
+  async funnel(selection: AnalyticsPeriodSelection, now = new Date()) {
+    const period = resolveAnalyticsPeriod(selection, now);
+    const paidPlanQuery = {
+      plan: { $in: [PlanSlug.Pro, PlanSlug.Premium] },
+      $or: [{ planExpiresAt: null }, { planExpiresAt: { $gt: now } }],
+    };
+    const activeExpr = {
+      $and: [
+        { $gte: ['$last', period.start] },
+        { $lt: ['$last', period.end] },
+      ],
+    };
+    const paidExpr = {
+      $and: [
+        { $in: [{ $ifNull: ['$plan', 'free'] }, [PlanSlug.Pro, PlanSlug.Premium]] },
+        {
+          $or: [
+            { $eq: [{ $ifNull: ['$planExpiresAt', null] }, null] },
+            { $gt: ['$planExpiresAt', now] },
+          ],
+        },
+      ],
+    };
+
+    const [registered, subscribed, recording] = await Promise.all([
+      User.countDocuments(consumers),
+      User.countDocuments({ ...consumers, ...paidPlanQuery }),
+      Expense.aggregate([
+        { $match: live },
+        { $group: { _id: '$user', last: { $max: '$createdAt' } } },
+        {
+          $lookup: {
+            from: 'users',
+            localField: '_id',
+            foreignField: '_id',
+            pipeline: [
+              { $match: consumers },
+              { $project: { _id: 1, plan: 1, planExpiresAt: 1 } },
+            ],
+            as: 'account',
+          },
+        },
+        { $match: { 'account.0': { $exists: true } } },
+        {
+          $set: {
+            plan: { $arrayElemAt: ['$account.plan', 0] },
+            planExpiresAt: { $arrayElemAt: ['$account.planExpiresAt', 0] },
+          },
+        },
+        { $unset: 'account' },
+        {
+          $group: {
+            _id: null,
+            recorded: { $sum: 1 },
+            active: { $sum: { $cond: [activeExpr, 1, 0] } },
+            paying: {
+              $sum: { $cond: [{ $and: [activeExpr, paidExpr] }, 1, 0] },
+            },
+          },
+        },
+        { $project: { _id: 0, recorded: 1, active: 1, paying: 1 } },
+      ]),
+    ]);
+
+    const totals = recording[0] || { recorded: 0, active: 0, paying: 0 };
+    const counts = [
+      { key: 'registered' as const, count: registered },
+      { key: 'recorded' as const, count: totals.recorded },
+      { key: 'active' as const, count: totals.active },
+      { key: 'paying' as const, count: totals.paying },
+    ];
+    const stages = counts.map((stage, index) => {
+      const previous = index === 0 ? null : counts[index - 1].count;
+      return {
+        ...stage,
+        share: registered ? roundPercent((stage.count / registered) * 100) : 0,
+        conversion:
+          previous === null
+            ? null
+            : previous
+              ? roundPercent((stage.count / previous) * 100)
+              : 0,
+      };
+    });
+
+    return {
+      period: {
+        days: period.days,
+        timezone: 'UTC',
+        start: period.start.toISOString(),
+        endExclusive: period.end.toISOString(),
+        generatedAt: new Date().toISOString(),
+      },
+      totals: {
+        registered,
+        subscribed,
+      },
+      stages,
     };
   }
 }

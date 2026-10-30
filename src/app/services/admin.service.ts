@@ -19,6 +19,16 @@ import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import { safeSearchPattern } from '../shared/search';
 
+export interface SyncTrendDay {
+  date: string;
+  total: number;
+  synced: number;
+  pending: number;
+  conflict: number;
+  error: number;
+  offline: number;
+}
+
 /**
  * Admin Service
  *
@@ -892,6 +902,115 @@ export class AdminService {
       };
     } catch (error) {
       logger.error('Error fetching admin sync operations:', error as Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the daily sync operation trend (UTC days, gap-filled).
+   *
+   * Read-only aggregate used by the sync dashboard. Days are clamped so a
+   * malformed query cannot trigger an unbounded aggregation.
+   */
+  async getSyncTrend(days: number = 14, now: Date = new Date()) {
+    const DAY = 86_400_000;
+    const range = Math.min(Math.max(Math.trunc(Number(days)) || 14, 1), 90);
+    const today = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+    );
+    const start = new Date(today.getTime() - (range - 1) * DAY);
+    const endExclusive = new Date(today.getTime() + DAY);
+
+    try {
+      const SyncOperation = mongoose.model('SyncOperation');
+      const rows: {
+        _id: { date?: string; status?: string };
+        count?: number;
+      }[] = await SyncOperation.aggregate([
+        { $match: { timestamp: { $gte: start, $lt: endExclusive } } },
+        {
+          $group: {
+            _id: {
+              date: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$timestamp',
+                  timezone: 'UTC',
+                },
+              },
+              status: '$status',
+            },
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const buckets = new Map<string, SyncTrendDay>();
+      for (let index = 0; index < range; index += 1) {
+        const date = new Date(start.getTime() + index * DAY)
+          .toISOString()
+          .slice(0, 10);
+        buckets.set(date, {
+          date,
+          total: 0,
+          synced: 0,
+          pending: 0,
+          conflict: 0,
+          error: 0,
+          offline: 0,
+        });
+      }
+      for (const row of rows) {
+        const bucket = row._id?.date ? buckets.get(row._id.date) : undefined;
+        if (!bucket) continue;
+        const count = Number(row.count) || 0;
+        bucket.total += count;
+        switch (row._id?.status) {
+          case 'synced':
+          case 'pending':
+          case 'conflict':
+          case 'error':
+          case 'offline':
+            bucket[row._id.status] += count;
+            break;
+          default:
+            break;
+        }
+      }
+
+      const series = [...buckets.values()];
+      const totals = series.reduce(
+        (acc, day) => ({
+          total: acc.total + day.total,
+          synced: acc.synced + day.synced,
+          pending: acc.pending + day.pending,
+          conflict: acc.conflict + day.conflict,
+          error: acc.error + day.error,
+          offline: acc.offline + day.offline,
+        }),
+        {
+          total: 0,
+          synced: 0,
+          pending: 0,
+          conflict: 0,
+          error: 0,
+          offline: 0,
+        }
+      );
+
+      return {
+        period: {
+          days: range,
+          timezone: 'UTC',
+          start: start.toISOString(),
+          endExclusive: endExclusive.toISOString(),
+          generatedAt: new Date().toISOString(),
+        },
+        totals,
+        series,
+      };
+    } catch (error) {
+      logger.error('Error fetching sync trend:', error as Error);
       throw error;
     }
   }

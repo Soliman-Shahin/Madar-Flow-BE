@@ -85,6 +85,27 @@ export const adminAnalyticsController = {
       return next(error);
     }
   },
+  async funnel(req: Request, res: Response, next: NextFunction) {
+    const query = periodQuery.safeParse(req.query);
+    if (!query.success)
+      return sendError(
+        res,
+        'Choose a preset period or a complete start/end range.',
+        400,
+        'INVALID_ANALYTICS_QUERY'
+      );
+    try {
+      return sendSuccess(
+        res,
+        await adminAnalyticsService.funnel(periodSelection(query.data)),
+        'Activation funnel retrieved successfully'
+      );
+    } catch (error) {
+      if (error instanceof RangeError)
+        return sendError(res, error.message, 400, 'INVALID_ANALYTICS_QUERY');
+      return next(error);
+    }
+  },
   async subscriptions(req: Request, res: Response, next: NextFunction) {
     const query = z
       .object({

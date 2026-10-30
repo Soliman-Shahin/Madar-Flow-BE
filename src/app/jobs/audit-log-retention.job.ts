@@ -1,8 +1,12 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import logger from '../services/logger.service';
 import { auditLogService } from '../services/audit-log.service';
+import { jobRuns } from './job-runs';
 
 export const AUDIT_LOG_RETENTION_CRON = '0 3 * * *';
+const JOB_NAME = 'auditLogRetention';
+
+jobRuns.register(JOB_NAME, AUDIT_LOG_RETENTION_CRON);
 export const DEFAULT_AUDIT_LOG_RETENTION_DAYS = 365;
 /** Lower bound so a typo in the env var cannot wipe recent security history. */
 export const MIN_AUDIT_LOG_RETENTION_DAYS = 30;
@@ -26,8 +30,9 @@ export class AuditLogRetentionJob {
   start(): void {
     if (this.task) return;
     this.task = cron.schedule(AUDIT_LOG_RETENTION_CRON, () => {
-      void this.execute();
+      void jobRuns.track(JOB_NAME, () => this.execute());
     });
+    jobRuns.markScheduled(JOB_NAME, true);
     logger.info(
       `[AuditLogRetentionJob] Scheduler started with schedule: ${AUDIT_LOG_RETENTION_CRON}, retention ${resolveAuditLogRetentionDays()} days`
     );
@@ -36,6 +41,7 @@ export class AuditLogRetentionJob {
   stop(): void {
     this.task?.stop();
     this.task = null;
+    jobRuns.markScheduled(JOB_NAME, false);
   }
 
   async execute(
@@ -51,6 +57,7 @@ export class AuditLogRetentionJob {
       });
       return deleted;
     } catch (error: any) {
+      jobRuns.fail(JOB_NAME, error);
       logger.error(
         '[AuditLogRetentionJob] Retention failed',
         error?.message || 'unknown error'

@@ -4,6 +4,7 @@ import { adminService } from '../services/admin.service';
 import logger from '../services/logger.service';
 import { AuthenticatedRequest } from '../middleware/access.middleware';
 import { UserRole } from '../models/user.model';
+import { jobRuns } from '../jobs/job-runs';
 
 /**
  * Admin Controller
@@ -385,6 +386,32 @@ export class AdminController {
       next(error);
     }
   }
+
+  /**
+   * Get scheduled job health for this process
+   * GET /v1/admin/health/jobs
+   */
+  async getJobHealth(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      sendSuccess(
+        res,
+        {
+          processStartedAt: new Date(
+            Date.now() - process.uptime() * 1000
+          ).toISOString(),
+          generatedAt: new Date().toISOString(),
+          jobs: jobRuns.snapshot(),
+        },
+        'Scheduled jobs retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
   /**
    * Get sync operations
    * GET /v1/admin/sync/operations
@@ -409,6 +436,25 @@ export class AdminController {
         sortOrder
       );
       sendSuccess(res, result, 'Sync operations retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Get the daily sync trend
+   * GET /v1/admin/sync/trend
+   */
+  async getSyncTrend(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const days = parseInt(req.query.days as string, 10) || 14;
+
+      const result = await adminService.getSyncTrend(days);
+      sendSuccess(res, result, 'Sync trend retrieved successfully');
     } catch (error) {
       next(error);
     }

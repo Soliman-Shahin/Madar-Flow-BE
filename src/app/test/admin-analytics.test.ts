@@ -381,6 +381,51 @@ describe('Analytics segment scopes', () => {
   });
 });
 
+describe('Activation funnel', () => {
+  it('nests every stage inside the previous one and measures the selected window', async () => {
+    await expense(
+      await consumer('paying@example.test', current, { plan: PlanSlug.Pro })
+    );
+    await expense(await consumer('active-free@example.test'));
+    await expense(await consumer('lapsed@example.test'), prior);
+    await consumer('never-recorded@example.test');
+    await consumer('staff@example.test', current, { role: 'admin' });
+    await consumer('deleted@example.test', current, { _isDeleted: true });
+
+    const funnel = await service.funnel(7, now);
+
+    expect(funnel.totals).toEqual({ registered: 4, subscribed: 1 });
+    expect(funnel.stages).toEqual([
+      { key: 'registered', count: 4, share: 100, conversion: null },
+      { key: 'recorded', count: 3, share: 75, conversion: 75 },
+      { key: 'active', count: 2, share: 50, conversion: 66.7 },
+      { key: 'paying', count: 1, share: 25, conversion: 50 },
+    ]);
+    expect(new Date(funnel.period.start).toISOString()).toBe(
+      '2026-10-20T00:00:00.000Z'
+    );
+    expect(new Date(funnel.period.endExclusive).toISOString()).toBe(
+      '2026-10-27T00:00:00.000Z'
+    );
+  });
+
+  it('does not count an expired paid plan as paying, even when the account is active', async () => {
+    await expense(
+      await consumer('expired@example.test', current, {
+        plan: PlanSlug.Pro,
+        planExpiresAt: new Date('2026-10-01T00:00:00Z'),
+      })
+    );
+
+    const funnel = await service.funnel(7, now);
+    const paying = funnel.stages.find((stage) => stage.key === 'paying');
+
+    expect(funnel.stages.find((stage) => stage.key === 'active')?.count).toBe(1);
+    expect(paying?.count).toBe(0);
+    expect(funnel.totals.subscribed).toBe(0);
+  });
+});
+
 describe('Admin analytics HTTP boundary', () => {
   const app = express();
   app.use('/v1/admin', adminRoutes);
@@ -490,5 +535,32 @@ describe('Admin analytics HTTP boundary', () => {
         ).status
       ).toBe(400);
     }
+  });
+  it('serves the funnel envelope to moderator+ and rejects an invalid period', async () => {
+    expect((await request(app).get('/v1/admin/analytics/funnel')).status).toBe(
+      401
+    );
+    const user = await consumer('funnel-moderator@example.test', current, {
+      role: 'moderator',
+    });
+    await user.createSession();
+    const token = await (await User.findById(
+      user._id
+    ))!.generateAccessAuthToken();
+    const get = (url: string) =>
+      request(app).get(url).auth(token, { type: 'bearer' });
+
+    const response = await get('/v1/admin/analytics/funnel?days=7');
+    expect(response.status).toBe(200);
+    expect(response.body.data.stages.map((stage: any) => stage.key)).toEqual([
+      'registered',
+      'recorded',
+      'active',
+      'paying',
+    ]);
+    for (const query of ['days=8', 'start=2026-10-01', 'days[$gt]=1'])
+      expect((await get(`/v1/admin/analytics/funnel?${query}`)).status).toBe(
+        400
+      );
   });
 });
