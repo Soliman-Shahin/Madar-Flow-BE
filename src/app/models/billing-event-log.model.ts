@@ -7,7 +7,11 @@ import { Schema, model, Document, Types } from 'mongoose';
  * payment providers deliver the same notification more than once, and a replay
  * must never extend or downgrade a plan twice.
  */
-export const BILLING_PROVIDERS = ['google_play', 'manual'] as const;
+export const BILLING_PROVIDERS = [
+  'revenuecat',
+  'google_play',
+  'manual',
+] as const;
 export type BillingProvider = (typeof BILLING_PROVIDERS)[number];
 
 export const BILLING_EVENT_TYPES = [

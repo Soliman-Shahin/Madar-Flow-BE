@@ -1,5 +1,5 @@
 import { Schema, model, Document } from 'mongoose';
-import { PlanSlug, PlanLimits } from '../types/plan.types';
+import { PlanSlug, PlanLimits, PlanPrice } from '../types/plan.types';
 import { Permission } from '../types/permissions.types';
 
 /**
@@ -21,6 +21,17 @@ export interface IPlan extends Document {
   currency: string;
   /** Billing cycle for this plan tier */
   billingCycle: 'monthly' | 'yearly' | 'lifetime';
+  /**
+   * Reference prices per currency (shown on web and as a fallback). The price
+   * a store charges is set in Play Console / App Store Connect, not here.
+   */
+  prices: PlanPrice[];
+  /**
+   * Store subscription product ids that grant this plan (for example
+   * `pro_monthly`, `pro_yearly`). A Google Play id may carry a base plan
+   * suffix (`pro_monthly:monthly`); only the part before `:` is compared.
+   */
+  productIds: string[];
   /** Hard usage limits enforced server-side for this plan */
   limits: PlanLimits;
   /** List of permissions included in this plan */
@@ -51,6 +62,27 @@ const PlanSchema = new Schema<IPlan>(
       type: String,
       enum: ['monthly', 'yearly', 'lifetime'],
       default: 'monthly',
+    },
+    prices: {
+      type: [
+        {
+          _id: false,
+          currency: {
+            type: String,
+            required: true,
+            trim: true,
+            uppercase: true,
+            minlength: 3,
+            maxlength: 3,
+          },
+          amount: { type: Number, required: true, min: 0 },
+        },
+      ],
+      default: [],
+    },
+    productIds: {
+      type: [{ type: String, trim: true, maxlength: 200 }],
+      default: [],
     },
     limits: {
       maxCategories: { type: Number, default: null }, // null = unlimited
