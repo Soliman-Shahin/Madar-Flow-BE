@@ -40,7 +40,6 @@ const RoleSchema = new Schema<RoleDocument>(
 );
 
 // Indexes
-RoleSchema.index({ slug: 1 });
 
 const Role = model<RoleDocument, Model<RoleDocument>>('Role', RoleSchema);
 export { Role };

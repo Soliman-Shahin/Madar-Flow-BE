@@ -23,7 +23,7 @@ export class BiometricCredentialService {
           lastUsedAt: undefined,
         },
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
     return credential;
   }
@@ -35,7 +35,7 @@ export class BiometricCredentialService {
         revokedAt: { $exists: false },
       },
       { $set: { lastUsedAt: new Date() } },
-      { new: true }
+      { returnDocument: 'after' }
     ).select('+credentialHash');
   }
   static revokeCurrent(userId: string, deviceId: string) {

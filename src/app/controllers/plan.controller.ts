@@ -224,7 +224,7 @@ export class PlanController {
   ): Promise<void> {
     try {
       const plan = await Plan.findByIdAndUpdate(req.params.id, req.body, {
-        new: true,
+        returnDocument: 'after',
         runValidators: true,
       });
       if (!plan) throw new NotFoundError('Plan', req.params.id as string);
@@ -249,7 +249,7 @@ export class PlanController {
       const plan = await Plan.findByIdAndUpdate(
         req.params.id,
         { isActive: false },
-        { new: true }
+        { returnDocument: 'after' }
       );
       if (!plan) throw new NotFoundError('Plan', req.params.id as string);
       logger.info(`Admin deactivated plan: ${plan.slug}`);
