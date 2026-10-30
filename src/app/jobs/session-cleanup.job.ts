@@ -4,8 +4,12 @@ import {
   SessionCleanupService,
   type SessionCleanupResult,
 } from '../services/session-cleanup.service';
+import { jobRuns } from './job-runs';
 
 export const SESSION_CLEANUP_CRON = '30 2 * * *';
+const JOB_NAME = 'sessionCleanup';
+
+jobRuns.register(JOB_NAME, SESSION_CLEANUP_CRON);
 
 export class SessionCleanupJob {
   private task: ScheduledTask | null = null;
@@ -14,8 +18,9 @@ export class SessionCleanupJob {
   start(): void {
     if (this.task) return;
     this.task = cron.schedule(SESSION_CLEANUP_CRON, () => {
-      void this.execute();
+      void jobRuns.track(JOB_NAME, () => this.execute());
     });
+    jobRuns.markScheduled(JOB_NAME, true);
     logger.info(
       `[SessionCleanupJob] Scheduler started with schedule: ${SESSION_CLEANUP_CRON}`
     );
@@ -24,6 +29,7 @@ export class SessionCleanupJob {
   stop(): void {
     this.task?.stop();
     this.task = null;
+    jobRuns.markScheduled(JOB_NAME, false);
   }
 
   async execute(
@@ -37,6 +43,7 @@ export class SessionCleanupJob {
       logger.info('[SessionCleanupJob] Cleanup completed', result);
       return result;
     } catch (error: any) {
+      jobRuns.fail(JOB_NAME, error);
       logger.error(
         '[SessionCleanupJob] Cleanup failed',
         error?.message || 'unknown error'

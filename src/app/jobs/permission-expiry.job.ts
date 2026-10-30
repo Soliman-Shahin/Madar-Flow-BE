@@ -1,6 +1,12 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import { temporaryPermissionService } from '../services/temporary-permission.service';
 import logger from '../services/logger.service';
+import { jobRuns } from './job-runs';
+
+const JOB_NAME = 'permissionExpiry';
+const DEFAULT_PERMISSION_EXPIRY_CRON = '0 * * * *';
+
+jobRuns.register(JOB_NAME, DEFAULT_PERMISSION_EXPIRY_CRON);
 
 /**
  * Permission Expiry Job
@@ -15,15 +21,17 @@ class PermissionExpiryJob {
    * Start the cron job
    * Runs every hour by default
    */
-  start(cronExpression: string = '0 * * * *'): void {
+  start(cronExpression: string = DEFAULT_PERMISSION_EXPIRY_CRON): void {
     if (this.task) {
       logger.warn('Permission expiry job is already running');
       return;
     }
 
-    this.task = cron.schedule(cronExpression, async () => {
-      await this.execute();
+    jobRuns.register(JOB_NAME, cronExpression);
+    this.task = cron.schedule(cronExpression, () => {
+      void jobRuns.track(JOB_NAME, () => this.execute());
     });
+    jobRuns.markScheduled(JOB_NAME, true);
 
     logger.info(`Permission expiry job started with schedule: ${cronExpression}`);
   }
@@ -35,6 +43,7 @@ class PermissionExpiryJob {
     if (this.task) {
       this.task.stop();
       this.task = null;
+      jobRuns.markScheduled(JOB_NAME, false);
       logger.info('Permission expiry job stopped');
     }
   }
@@ -54,6 +63,7 @@ class PermissionExpiryJob {
         logger.debug('Permission expiry job completed: no expired permissions found');
       }
     } catch (error: any) {
+      jobRuns.fail(JOB_NAME, error);
       logger.error('Error in permission expiry job:', error.message);
     }
   }

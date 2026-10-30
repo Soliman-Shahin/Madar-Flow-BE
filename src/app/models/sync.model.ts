@@ -139,6 +139,8 @@ const syncMetadataSchema = new Schema(
 syncOperationSchema.index({ user: 1, status: 1 });
 syncOperationSchema.index({ user: 1, timestamp: -1 });
 syncOperationSchema.index({ status: 1, user: 1 });
+// Admin trend aggregation scans a timestamp range grouped by status.
+syncOperationSchema.index({ timestamp: -1, status: 1 });
 
 conflictResolutionSchema.index({ user: 1, timestamp: -1 });
 conflictResolutionSchema.index({ entityId: 1, entityType: 1 });

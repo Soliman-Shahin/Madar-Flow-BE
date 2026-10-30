@@ -22,6 +22,11 @@ router.get(
   adminAnalyticsController.engagement
 );
 router.get(
+  '/analytics/funnel',
+  requireModerator,
+  adminAnalyticsController.funnel
+);
+router.get(
   '/analytics/subscriptions',
   requireAdmin,
   adminAnalyticsController.subscriptions
@@ -57,6 +62,11 @@ router.get(
   '/health',
   requireModerator,
   adminController.getSystemHealth.bind(adminController)
+);
+router.get(
+  '/health/jobs',
+  requireModerator,
+  adminController.getJobHealth.bind(adminController)
 );
 
 // ==================== EXPENSES (Moderator: Read, Admin: Write) ====================
@@ -157,6 +167,11 @@ router.get(
   '/sync/operations',
   requireModerator,
   adminController.getSyncOperations.bind(adminController)
+);
+router.get(
+  '/sync/trend',
+  requireModerator,
+  adminController.getSyncTrend.bind(adminController)
 );
 router.get(
   '/sync/conflicts',
