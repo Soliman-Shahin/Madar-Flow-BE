@@ -239,7 +239,7 @@ export class PlanService {
     const plan = await this.getPlanBySlug(user.plan);
     const context = await this.getUserPlanContext(userId);
 
-    const categoriesCount = await Category.countDocuments({ userId });
+    const categoriesCount = await this.countCategories(userId);
     const transactionsThisMonth = await this.getTransactionsThisMonth(userId);
 
     const usage = {
@@ -284,7 +284,7 @@ export class PlanService {
     const { maxCategories } = context.limits;
     if (maxCategories === null) return;
 
-    const count = await Category.countDocuments({ userId });
+    const count = await this.countCategories(userId);
     if (count >= maxCategories) {
       throw new PlanLimitError(
         'categories',
@@ -316,11 +316,21 @@ export class PlanService {
   private async getTransactionsThisMonth(userId: string): Promise<number> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
+    // The models store the owner in `user` (not `userId`), and soft-deleted
+    // rows must not count against the plan.
     return Expense.countDocuments({
-      userId,
-      date: { $gte: startOfMonth, $lte: endOfMonth },
+      user: userId,
+      _isDeleted: { $ne: true },
+      date: { $gte: startOfMonth, $lt: startOfNextMonth },
+    });
+  }
+
+  private async countCategories(userId: string): Promise<number> {
+    return Category.countDocuments({
+      user: userId,
+      _isDeleted: { $ne: true },
     });
   }
 
@@ -404,7 +414,7 @@ export class PlanService {
   // ── Usage Stats ────────────────────────────────────────────────────────────
 
   async getUserUsageStats(userId: string, context: UserPlanContext) {
-    const categoriesCount = await Category.countDocuments({ userId });
+    const categoriesCount = await this.countCategories(userId);
     const transactionsThisMonth = await this.getTransactionsThisMonth(userId);
 
     return {
