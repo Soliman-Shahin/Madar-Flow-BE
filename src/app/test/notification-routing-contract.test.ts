@@ -2,10 +2,14 @@ import fs from 'fs';
 import path from 'path';
 
 describe('notification routing contract', () => {
-  const routeSource = fs.readFileSync(
-    path.join(process.cwd(), 'src/app/routes/notification.route.ts'),
-    'utf8'
-  );
+  // Normalize line endings so the multi-line assertions also hold on Windows
+  // checkouts where git converts LF to CRLF (core.autocrlf).
+  const routeSource = fs
+    .readFileSync(
+      path.join(process.cwd(), 'src/app/routes/notification.route.ts'),
+      'utf8'
+    )
+    .replace(/\r\n/g, '\n');
 
   it('registers the static list route before the dynamic detail route', () => {
     expect(routeSource.indexOf("router.get('/list'")).toBeGreaterThan(-1);
