@@ -77,3 +77,18 @@ Changing the history period changes historical starts, not live assignment total
 - Rendered review found and corrected RTL return-count ambiguity, a missing breadcrumb translation, and the expiry selector's accessible label. Native controls/tables/scroll regions retain keyboard access and reduced-motion behavior. Blue quantitative heat cells always include readable rates and numerator/denominator text; color is not the sole encoding.
 - Visual critic verdict: **PASS for this extension**, not a new Golden Reference. Scores out of 5: identity 4, first-view hierarchy 4, typography 4, composition 4, numerical hierarchy 4, financial character 4, surfaces 4, color discipline 4, density 4, interaction clarity 4, dark 4, light 4, RTL 4, responsive 4, generic-AI resistance 4. Visible evidence: shared blue/tonal grammar, one numerical spine, textual cohort matrix, chronological expiry rows, readable narrow stacks and equally composed theme/direction variants.
 - Evidence/scripts remain outside repositories under `.tmp/dashboard-review/insights-*` and `phase2-*`. No deployment, production data test, remote service mutation, push or merge was performed for these new phases. Real deployed integration and future accumulated observation data remain unverified.
+
+## Custom periods and shared comparison context — phase 5
+
+The overview, engagement and subscription endpoints accept one of two mutually exclusive period shapes:
+
+- `days=7|30|90` for a preset window.
+- `start=YYYY-MM-DD&end=YYYY-MM-DD` for an inclusive custom UTC-date window.
+
+`compare=previous|yearAgo` is optional and defaults to `previous`. Custom ranges contain 1–366 complete UTC days, cannot include the current/future UTC day and reject invalid calendar dates. `previous` uses the immediately adjacent same-length range. `yearAgo` uses the same number of days ending exactly one UTC calendar year before the selected range's exclusive end. Responses expose `days`, nullable `presetDays`, `comparison`, `start`, `endExclusive`, `previousStart` and `previousEndExclusive`; the two compared ranges therefore always contain the same number of days.
+
+Supplying `days` together with `start`/`end`, supplying only one custom bound, unknown query keys or unsupported comparison values returns 400. Records drill-down accepts the same period shape. The existing preset `asOf` snapshot anchor remains supported; custom ranges are resolved from their explicit bounds.
+
+The shared URL state preserves the period, comparison and applicable segment filters across Overview, Recording & return and Subscriptions. Overview and engagement support current assigned `plan=free|pro|premium` and current category `type=income|outcome`. Subscriptions supports current assigned plan only and rejects `type`; the Admin client deliberately omits type from that request. Snapshot metrics remain explicitly separate from historical-period metrics where documented.
+
+The Admin period workbench validates ranges before requesting the API, reports complete-UTC-day semantics, prevents duplicate requests on apply and keeps browser back/forward/shareable URLs deterministic. Rendered verification covers English/Arabic, light/dark and 1440/390px with no viewport overflow; a cross-page browser check verifies period/filter propagation and confirms invalid ranges never reach the API.
