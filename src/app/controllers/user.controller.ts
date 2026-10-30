@@ -479,7 +479,7 @@ const updateMe = async (
     }
 
     const updated = await User.findByIdAndUpdate(userId, updatePayload, {
-      new: true,
+      returnDocument: 'after',
       runValidators: true,
     });
 
@@ -518,7 +518,7 @@ const uploadAvatar = async (
     const updated = await User.findByIdAndUpdate(
       userId,
       { image: dataUrl },
-      { new: true }
+      { returnDocument: 'after' }
     );
     if (!updated) return sendError(res, 'User not found', 404);
 

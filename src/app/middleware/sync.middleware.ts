@@ -155,9 +155,12 @@ export const rateLimitSync = (
 
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.path.includes('/sync/') || req.originalUrl?.includes('/sync/')) {
-      const userId = (req as any).user?._id;
+      // Must run after authentication: without an identity every caller would
+      // share one counter and a single busy hour would lock everyone out.
+      const identity =
+        (req as any).user?._id || (req as any).user_id || req.ip || 'unknown';
       const now = Date.now();
-      const key = `sync_${userId}`;
+      const key = `sync_${String(identity)}`;
 
       const userRequests = requests.get(key);
 

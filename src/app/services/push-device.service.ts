@@ -48,13 +48,13 @@ export class PushDeviceService {
 
     const record = target
       ? await DevicePushToken.findByIdAndUpdate(target._id, update, {
-          new: true,
+          returnDocument: 'after',
           runValidators: true,
         })
       : await DevicePushToken.findOneAndUpdate(
           { userId, deviceId: input.deviceId, platform: input.platform },
           update,
-          { new: true, upsert: true, runValidators: true }
+          { returnDocument: 'after', upsert: true, runValidators: true }
         );
 
     if (!record) {
@@ -80,7 +80,7 @@ export class PushDeviceService {
         invalidReason: 'user_unregistered',
         lastSeenAt: now,
       },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     return { deviceId, active: false, found: !!result };

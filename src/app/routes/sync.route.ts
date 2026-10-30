@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { syncController } from '../controllers/sync.controller';
 import { verifyAccessToken } from '../middleware/access.middleware';
+import { rateLimitSync } from '../middleware/sync.middleware';
 import { validateRequest } from '../middleware/validation.middleware';
 import { body, query } from 'express-validator';
 
@@ -8,6 +9,9 @@ const router = Router();
 
 // Apply JWT auth middleware to all sync routes
 router.use(verifyAccessToken);
+
+// Per-user limit; it has to sit after authentication to know who is calling.
+router.use(rateLimitSync(100, 15 * 60 * 1000));
 
 // ==================== SYNC DATA ROUTES ====================
 
