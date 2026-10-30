@@ -1,6 +1,6 @@
 import { Document, Schema, Types, model } from 'mongoose';
 
-export type PushPlatform = 'android' | 'ios';
+export type PushPlatform = 'android' | 'ios' | 'web';
 
 export interface DevicePushTokenDocument extends Document {
   userId: Types.ObjectId;
@@ -24,7 +24,7 @@ const DevicePushTokenSchema = new Schema<DevicePushTokenDocument>(
     token: { type: String, required: true, select: false },
     platform: {
       type: String,
-      enum: ['android', 'ios'],
+      enum: ['android', 'ios', 'web'],
       required: true,
     },
     appVersion: { type: String, trim: true, maxlength: 64 },

@@ -14,13 +14,18 @@ import csrf from 'csurf';
  */
 
 // Create CSRF protection middleware
-const csrfProtection = csrf({
-  cookie: {
-    httpOnly: true,
-    sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
-  },
-});
+const csrfCookiePath = (req: Request) =>
+  req.get('x-auth-cookie-path') === '/api/v1/user' ? '/api/v1' : '/v1';
+
+const runCsrfProtection = (req: Request, res: Response, next: NextFunction) =>
+  csrf({
+    cookie: {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: csrfCookiePath(req),
+    },
+  })(req, res, next);
 
 /**
  * Conditional CSRF middleware
@@ -31,7 +36,17 @@ export const conditionalCsrfProtection = (
   res: Response,
   next: NextFunction
 ) => {
-  // Skip CSRF for API routes with Bearer token
+  // Refresh cookies are ambient credentials, so their rotation and revocation
+  // must use a CSRF token even though native clients keep the explicit-body flow.
+  const refreshPaths = ['/v1/user/refresh-token', '/v1/user/logout'];
+  const usesRefreshCookie =
+    typeof req.cookies?.mf_refresh === 'string' ||
+    (req.get('x-auth-transport') === 'cookie' && refreshPaths.includes(req.path));
+  if (usesRefreshCookie && refreshPaths.includes(req.path)) {
+    return runCsrfProtection(req, res, next);
+  }
+
+  // Skip CSRF for API routes using explicit Bearer credentials.
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return next();
@@ -54,12 +69,10 @@ export const conditionalCsrfProtection = (
     '/v1/user/password/reset',
     '/v1/user/biometric/signin',
     '/v1/user/refresh-token',
-    // Logout authenticates using an explicit body credential, never ambient cookies.
-    '/v1/user/logout',
     '/api-docs',
   ];
 
-  if (exemptPaths.some((path) => req.path.includes(path))) {
+  if (!usesRefreshCookie && exemptPaths.some((path) => req.path.includes(path))) {
     return next();
   }
 
@@ -69,7 +82,7 @@ export const conditionalCsrfProtection = (
   }
 
   // Apply CSRF protection for other routes
-  csrfProtection(req, res, next);
+  runCsrfProtection(req, res, next);
 };
 
 /**
@@ -81,6 +94,12 @@ export const getCsrfToken = (req: Request, res: Response) => {
     csrfToken: (req as any).csrfToken?.() || null,
   });
 };
+
+export const issueCsrfToken = (req: Request, res: Response, next: NextFunction) =>
+  runCsrfProtection(req, res, (error?: unknown) => {
+    if (error) return next(error);
+    return res.json({ csrfToken: (req as any).csrfToken() });
+  });
 
 export default {
   conditionalCsrfProtection,

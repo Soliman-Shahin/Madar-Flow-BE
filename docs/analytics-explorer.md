@@ -92,3 +92,19 @@ Supplying `days` together with `start`/`end`, supplying only one custom bound, u
 The shared URL state preserves the period, comparison and applicable segment filters across Overview, Recording & return and Subscriptions. Overview and engagement support current assigned `plan=free|pro|premium` and current category `type=income|outcome`. Subscriptions supports current assigned plan only and rejects `type`; the Admin client deliberately omits type from that request. Snapshot metrics remain explicitly separate from historical-period metrics where documented.
 
 The Admin period workbench validates ranges before requesting the API, reports complete-UTC-day semantics, prevents duplicate requests on apply and keeps browser back/forward/shareable URLs deterministic. Rendered verification covers English/Arabic, light/dark and 1440/390px with no viewport overflow; a cross-page browser check verifies period/filter propagation and confirms invalid ranges never reach the API.
+
+## Scheduled email reports — phase 6
+
+The Admin route `/dashboard/analytics/reports` is available to Admin+ and manages the authenticated Admin's own email schedules:
+
+- `GET /v1/admin/analytics/reports` lists non-cancelled schedules, whether the current account email is verified, the verified recipient address (otherwise null), and the active-schedule limit.
+- `POST /v1/admin/analytics/reports` creates a weekly (ISO weekday) or monthly (day 1–28) schedule.
+- `PUT /v1/admin/analytics/reports/:id` replaces a schedule's recurrence, timezone, reporting period/comparison, current assigned-plan and record-type filters, and email language.
+- `PATCH /v1/admin/analytics/reports/:id/status` accepts only `{active:boolean}` to pause/resume.
+- `DELETE /v1/admin/analytics/reports/:id` soft-cancels a schedule. All operations are owner-scoped; create, edit, pause/resume, and cancel actions are audited. Bodies are strict and reject unknown fields.
+
+The email can only go to the current owner's freshly rechecked email when that account remains active, undeleted, Admin+, and email-verified. The address is never accepted from client input. Each owner may keep up to five active schedules. Recurrence uses the configured IANA timezone and local wall-clock hour; monthly dates are capped at 28 to avoid month-end ambiguity. Reports cover the selected number of fully completed UTC days and use the existing analytics comparison/filter definitions. Email contains counts and leading category counts/shares; it does not include financial amounts, revenue claims, or transaction rows. English/Arabic email output explains the count semantics.
+
+The worker runs every five minutes. A database lease claims each due occurrence across concurrent processes. Delivery failures retry after 15 minutes up to five consecutive attempts, then pause the schedule; an ineligible owner pauses it immediately. Resend receives a stable per-schedule/per-occurrence idempotency key so retries of one occurrence do not intentionally create multiple messages. As with any external mail provider, an in-flight send can still complete if the owner pauses/cancels after the worker's final state check. No production mail was sent during local verification. Provider credentials/from-address remain deployment configuration and were not changed.
+
+Local verification for this phase: Admin development build passes; Backend TypeScript build passes; three isolated recurrence tests pass for Cairo weekly time, UTC monthly rollover, and invalid timezone rejection. The default Backend Jest setup currently times out while starting its shared MongoMemoryServer, before tests run; the isolated test config avoids that unrelated database setup. Live delivery, deployed cron execution, provider configuration, and rendered Admin browser matrix remain unverified.

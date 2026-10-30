@@ -2,6 +2,35 @@ import logger from './logger.service';
 import { BRAND } from '../config/brand.config';
 
 export class MailService {
+  static async sendAnalyticsReport(
+    email: string,
+    report: { subject: string; html: string; text: string },
+    idempotencyKey: string
+  ): Promise<void> {
+    const apiKey = process.env.RESEND_API_KEY;
+    const from = process.env.RESEND_FROM_EMAIL;
+    if (!apiKey || !from) throw new Error('Analytics report mail is not configured');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: report.subject,
+        html: report.html,
+        text: report.text,
+      }),
+    });
+    if (!response.ok) {
+      logger.error('Analytics report email delivery failed');
+      throw new Error('Analytics report mail delivery failed');
+    }
+  }
+
   static async sendPasswordReset(email: string, token: string): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM_EMAIL;

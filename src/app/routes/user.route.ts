@@ -22,7 +22,12 @@ import {
   revokeCurrentBiometric,
 } from '../controllers';
 import { UserService } from '../services/user.service';
-import { verifyAccessToken } from '../middleware/access.middleware';
+import {
+  setRefreshCookie,
+  usesHttpOnlyRefreshCookie,
+} from '../services/refresh-cookie.service';
+import { issueCsrfToken } from '../middleware/csrf.middleware';
+import { AuthenticatedRequest, verifyAccessToken } from '../middleware/access.middleware';
 import { validateRequestWithZod, verifySession } from '../middleware';
 import { loginSchema, signUpSchema } from '../validations/user.validation';
 import multer from 'multer';
@@ -66,13 +71,13 @@ const upload = multer({
  *           schema:
  *             type: object
  *             required:
- *               - name
  *               - email
  *               - password
+ *               - termsAccepted
+ *               - privacyAccepted
+ *               - termsVersion
+ *               - privacyVersion
  *             properties:
- *               name:
- *                 type: string
- *                 example: John Doe
  *               email:
  *                 type: string
  *                 format: email
@@ -81,10 +86,19 @@ const upload = multer({
  *                 type: string
  *                 format: password
  *                 minLength: 8
- *                 example: SecurePass123!
+ *               termsAccepted:
+ *                 type: boolean
+ *                 enum: [true]
+ *               privacyAccepted:
+ *                 type: boolean
+ *                 enum: [true]
+ *               termsVersion:
+ *                 type: string
+ *               privacyVersion:
+ *                 type: string
  *     responses:
- *       201:
- *         description: User created successfully
+ *       200:
+ *         description: Signup successful
  *         content:
  *           application/json:
  *             schema:
@@ -94,7 +108,17 @@ const upload = multer({
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/User'
+ *                   type: object
+ *                   required: [user, accessToken, refreshToken]
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                     accessToken:
+ *                       type: string
+ *                     refreshToken:
+ *                       type: string
+ *                 message:
+ *                   type: string
  *       400:
  *         description: Validation error
  *         content:
@@ -138,7 +162,7 @@ router.post(
  *               password:
  *                 type: string
  *                 format: password
- *                 example: SecurePass123!
+ *                 example: '{{password}}'
  *     responses:
  *       200:
  *         description: Login successful
@@ -155,8 +179,12 @@ router.post(
  *                   properties:
  *                     accessToken:
  *                       type: string
+ *                     refreshToken:
+ *                       type: string
  *                     user:
  *                       $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
  *       401:
  *         description: Invalid credentials
  *         content:
@@ -175,6 +203,42 @@ router.post(
 );
 router.post('/refresh-token', strictAuthRateLimiter, refreshToken);
 router.post('/logout', strictAuthRateLimiter, logout);
+router.get('/csrf-token', issueCsrfToken);
+router.get('/sessions', verifyAccessToken, async (req: Request, res: Response) => {
+  const auth = req as AuthenticatedRequest;
+  const user = await User.findById(auth.user_id).select('sessions').lean();
+  const now = Math.floor(Date.now() / 1000);
+  const sessions = (user?.sessions || [])
+    .filter((session: any) => session.expiresAt > now)
+    .map((session: any) => ({
+      id: session.sessionId,
+      platform: session.platform || 'web',
+      createdAt: session.createdAt || null,
+      lastAuthenticatedAt: session.lastAuthenticatedAt || session.createdAt || null,
+      expiresAt: session.expiresAt,
+      current: session.sessionId === auth.sessionId,
+    }));
+  return res.json({ success: true, data: { sessions } });
+});
+router.delete('/sessions/others', verifyAccessToken, async (req: Request, res: Response) => {
+  const auth = req as AuthenticatedRequest;
+  const result = await User.updateOne(
+    { _id: auth.user_id },
+    { $pull: { sessions: { sessionId: { $ne: auth.sessionId } } } }
+  );
+  return res.json({ success: true, data: { revoked: result.modifiedCount > 0 } });
+});
+router.delete('/sessions/:sessionId', verifyAccessToken, async (req: Request, res: Response) => {
+  const auth = req as AuthenticatedRequest;
+  if (!req.params.sessionId || req.params.sessionId === auth.sessionId) {
+    return res.status(400).json({ success: false, message: 'Current session must use logout' });
+  }
+  const result = await User.updateOne(
+    { _id: auth.user_id },
+    { $pull: { sessions: { sessionId: req.params.sessionId } } }
+  );
+  return res.json({ success: true, data: { revoked: result.modifiedCount > 0 } });
+});
 router.post(
   '/auth/google/exchange',
   strictAuthRateLimiter,
@@ -224,9 +288,15 @@ router.post(
         : {}),
     };
 
+    const cookieAuth = usesHttpOnlyRefreshCookie(req);
+    if (cookieAuth) setRefreshCookie(req, res, refreshToken);
+
     return res.status(200).json({
       success: true,
-      data: { user: safeUser, tokens: { accessToken, refreshToken } },
+      data: {
+        user: safeUser,
+        tokens: cookieAuth ? { accessToken } : { accessToken, refreshToken },
+      },
       message: 'Authentication successful',
     });
   }
@@ -379,8 +449,14 @@ router.post('/auth/google/native', async (req: Request, res: Response) => {
 
     if (!user || user._isDeleted || user.isActive === false)
       return res.status(401).json({ message: 'Account unavailable' });
+    const clientPlatform = req.get('x-client-platform');
+    const platform = clientPlatform === 'ios' ? 'ios' : 'android';
     const { refreshToken, accessToken } =
-      await UserService.createAuthenticatedSession(user, 'google_native');
+      await UserService.createAuthenticatedSession(
+        user,
+        'google_native',
+        platform
+      );
 
     const rawUser = (user as any).toJSON ? (user as any).toJSON() : user;
     const { password, sessions, ...safeUser } = rawUser;

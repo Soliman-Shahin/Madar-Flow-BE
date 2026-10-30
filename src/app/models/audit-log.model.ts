@@ -41,6 +41,9 @@ export enum AuditAction {
 
   // App content (dashboard-managed settings)
   APP_SETTINGS_UPDATED = 'app_settings:updated',
+  ANALYTICS_REPORT_SCHEDULE_CREATED = 'analytics_report_schedule:created',
+  ANALYTICS_REPORT_SCHEDULE_UPDATED = 'analytics_report_schedule:updated',
+  ANALYTICS_REPORT_SCHEDULE_CANCELLED = 'analytics_report_schedule:cancelled',
 
   // Resource Management
   EXPENSE_CREATED = 'expense:created',
