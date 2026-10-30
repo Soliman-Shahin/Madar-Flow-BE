@@ -66,13 +66,13 @@ const upload = multer({
  *           schema:
  *             type: object
  *             required:
- *               - name
  *               - email
  *               - password
+ *               - termsAccepted
+ *               - privacyAccepted
+ *               - termsVersion
+ *               - privacyVersion
  *             properties:
- *               name:
- *                 type: string
- *                 example: John Doe
  *               email:
  *                 type: string
  *                 format: email
@@ -81,10 +81,19 @@ const upload = multer({
  *                 type: string
  *                 format: password
  *                 minLength: 8
- *                 example: SecurePass123!
+ *               termsAccepted:
+ *                 type: boolean
+ *                 enum: [true]
+ *               privacyAccepted:
+ *                 type: boolean
+ *                 enum: [true]
+ *               termsVersion:
+ *                 type: string
+ *               privacyVersion:
+ *                 type: string
  *     responses:
- *       201:
- *         description: User created successfully
+ *       200:
+ *         description: Signup successful
  *         content:
  *           application/json:
  *             schema:
@@ -94,7 +103,17 @@ const upload = multer({
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/User'
+ *                   type: object
+ *                   required: [user, accessToken, refreshToken]
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                     accessToken:
+ *                       type: string
+ *                     refreshToken:
+ *                       type: string
+ *                 message:
+ *                   type: string
  *       400:
  *         description: Validation error
  *         content:
@@ -138,7 +157,7 @@ router.post(
  *               password:
  *                 type: string
  *                 format: password
- *                 example: SecurePass123!
+ *                 example: '{{password}}'
  *     responses:
  *       200:
  *         description: Login successful
@@ -155,8 +174,12 @@ router.post(
  *                   properties:
  *                     accessToken:
  *                       type: string
+ *                     refreshToken:
+ *                       type: string
  *                     user:
  *                       $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
  *       401:
  *         description: Invalid credentials
  *         content:
