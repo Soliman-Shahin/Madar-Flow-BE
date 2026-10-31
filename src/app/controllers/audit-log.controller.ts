@@ -6,7 +6,7 @@ import logger from '../services/logger.service';
 
 /**
  * Audit Log Controller
- * 
+ *
  * Handles HTTP requests for audit log queries and statistics
  */
 class AuditLogController {
@@ -81,7 +81,12 @@ class AuditLogController {
       sendSuccess(res, result, 'User audit logs retrieved successfully');
     } catch (error: any) {
       logger.error('Error getting user audit logs:', error.message);
-      sendError(res, 'Failed to retrieve user audit logs', 500, 'INTERNAL_ERROR');
+      sendError(
+        res,
+        'Failed to retrieve user audit logs',
+        500,
+        'INTERNAL_ERROR'
+      );
     }
   }
 
@@ -96,7 +101,11 @@ class AuditLogController {
 
       const logs = await auditLogService.getRecentSecurityEvents(limitNum);
 
-      sendSuccess(res, { logs }, 'Recent security events retrieved successfully');
+      sendSuccess(
+        res,
+        { logs },
+        'Recent security events retrieved successfully'
+      );
     } catch (error: any) {
       logger.error('Error getting recent security events:', error.message);
       sendError(
@@ -171,10 +180,14 @@ class AuditLogController {
 
       const deletedCount = await auditLogService.deleteOldLogs(days);
 
-      sendSuccess(res, {
-        deletedCount,
-        olderThanDays: days,
-      }, `Deleted ${deletedCount} old audit logs`);
+      sendSuccess(
+        res,
+        {
+          deletedCount,
+          olderThanDays: days,
+        },
+        `Deleted ${deletedCount} old audit logs`
+      );
     } catch (error: any) {
       logger.error('Error cleaning up audit logs:', error.message);
       sendError(res, 'Failed to cleanup audit logs', 500, 'INTERNAL_ERROR');

@@ -1,12 +1,17 @@
 import { Request } from 'express';
-import { AuditLog, AuditAction, AuditSeverity, IAuditLog } from '../models/audit-log.model';
+import {
+  AuditLog,
+  AuditAction,
+  AuditSeverity,
+  IAuditLog,
+} from '../models/audit-log.model';
 import { UserRole } from '../models/user.model';
 import logger from './logger.service';
 import { redactSensitive } from '../shared/redact';
 
 /**
  * Audit Log Service
- * 
+ *
  * Centralized service for logging all security-sensitive operations
  */
 class AuditLogService {
@@ -52,7 +57,9 @@ class AuditLogService {
         actorRole: params.actorRole,
         actorEmail: params.actorEmail,
         action: params.action,
-        severity: params.severity || this.determineSeverity(params.action, params.success),
+        severity:
+          params.severity ||
+          this.determineSeverity(params.action, params.success),
         targetUserId: params.targetUserId,
         targetRole: params.targetRole,
         targetResourceType: params.targetResourceType,
@@ -69,14 +76,20 @@ class AuditLogService {
       });
 
       await auditLog.save();
-      
+
       // Log to console for critical events
-      if (params.severity === AuditSeverity.CRITICAL || params.severity === AuditSeverity.ERROR) {
-        logger.warn(`[AUDIT] ${params.action} by ${params.actorEmail || params.actorId || 'system'}`, {
-          action: params.action,
-          severity: params.severity,
-          success: params.success,
-        });
+      if (
+        params.severity === AuditSeverity.CRITICAL ||
+        params.severity === AuditSeverity.ERROR
+      ) {
+        logger.warn(
+          `[AUDIT] ${params.action} by ${params.actorEmail || params.actorId || 'system'}`,
+          {
+            action: params.action,
+            severity: params.severity,
+            success: params.success,
+          }
+        );
       }
 
       return auditLog;
@@ -194,8 +207,8 @@ class AuditLogService {
       if (filters.actorId) query.actorId = filters.actorId;
       if (filters.targetUserId) query.targetUserId = filters.targetUserId;
       if (filters.action) {
-        query.action = Array.isArray(filters.action) 
-          ? { $in: filters.action } 
+        query.action = Array.isArray(filters.action)
+          ? { $in: filters.action }
           : filters.action;
       }
       if (filters.severity) {
@@ -249,9 +262,7 @@ class AuditLogService {
   /**
    * Get recent security events
    */
-  async getRecentSecurityEvents(
-    limit: number = 100
-  ): Promise<IAuditLog[]> {
+  async getRecentSecurityEvents(limit: number = 100): Promise<IAuditLog[]> {
     const securityActions = [
       AuditAction.USER_LOGIN_FAILED,
       AuditAction.ACCESS_DENIED,
@@ -275,7 +286,10 @@ class AuditLogService {
   /**
    * Get statistics for a time period
    */
-  async getStats(startDate: Date, endDate: Date): Promise<{
+  async getStats(
+    startDate: Date,
+    endDate: Date
+  ): Promise<{
     totalLogs: number;
     byAction: Record<string, number>;
     bySeverity: Record<string, number>;
@@ -296,12 +310,8 @@ class AuditLogService {
               { $group: { _id: '$action', count: { $sum: 1 } } },
               { $sort: { count: -1 } },
             ],
-            bySeverity: [
-              { $group: { _id: '$severity', count: { $sum: 1 } } },
-            ],
-            successRate: [
-              { $group: { _id: '$success', count: { $sum: 1 } } },
-            ],
+            bySeverity: [{ $group: { _id: '$severity', count: { $sum: 1 } } }],
+            successRate: [{ $group: { _id: '$success', count: { $sum: 1 } } }],
             topActors: [
               { $match: { actorId: { $exists: true } } },
               { $group: { _id: '$actorId', count: { $sum: 1 } } },
@@ -315,7 +325,8 @@ class AuditLogService {
 
       const result = stats[0];
       const totalLogs = result.total[0]?.count || 0;
-      const successCount = result.successRate.find((s: any) => s._id === true)?.count || 0;
+      const successCount =
+        result.successRate.find((s: any) => s._id === true)?.count || 0;
 
       return {
         totalLogs,
@@ -348,7 +359,9 @@ class AuditLogService {
         timestamp: { $lt: cutoffDate },
       });
 
-      logger.info(`Deleted ${result.deletedCount} audit logs older than ${olderThanDays} days`);
+      logger.info(
+        `Deleted ${result.deletedCount} audit logs older than ${olderThanDays} days`
+      );
       return result.deletedCount || 0;
     } catch (error: any) {
       logger.error('Failed to delete old audit logs:', error.message);
@@ -359,10 +372,17 @@ class AuditLogService {
   /**
    * Helper: Determine severity based on action and success
    */
-  private determineSeverity(action: AuditAction, success?: boolean): AuditSeverity {
+  private determineSeverity(
+    action: AuditAction,
+    success?: boolean
+  ): AuditSeverity {
     // Failed actions are more severe
     if (success === false) {
-      if (action.includes('login') || action.includes('access') || action.includes('permission')) {
+      if (
+        action.includes('login') ||
+        action.includes('access') ||
+        action.includes('permission')
+      ) {
         return AuditSeverity.WARNING;
       }
       return AuditSeverity.ERROR;

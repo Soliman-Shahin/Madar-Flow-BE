@@ -4,7 +4,7 @@ import { PlanSlug } from '../types/plan.types';
 
 /**
  * Error Message Service
- * 
+ *
  * Provides enhanced, user-friendly error messages with actionable suggestions.
  */
 class ErrorMessageService {
@@ -23,18 +23,19 @@ class ErrorMessageService {
     learnMoreUrl: string;
   } {
     const { permission, currentPlan } = params;
-    
+
     // Determine which plan includes this permission
     const requiredPlan = this.getMinimumPlanForPermission(permission);
-    
+
     // Generate user-friendly message
     const featureName = this.getFeatureName(permission);
     const message = `Access to "${featureName}" is not available on your current ${this.getPlanDisplayName(currentPlan)} plan.`;
-    
-    const suggestion = requiredPlan === currentPlan
-      ? 'This feature is not available on any plan yet. Contact support for more information.'
-      : `Upgrade to ${this.getPlanDisplayName(requiredPlan)} to unlock this feature.`;
-    
+
+    const suggestion =
+      requiredPlan === currentPlan
+        ? 'This feature is not available on any plan yet. Contact support for more information.'
+        : `Upgrade to ${this.getPlanDisplayName(requiredPlan)} to unlock this feature.`;
+
     return {
       message,
       suggestion,
@@ -57,10 +58,10 @@ class ErrorMessageService {
     requiredPlan: PlanSlug;
   } {
     const { scope, currentPlan } = params;
-    
+
     const requiredPlan = this.getMinimumPlanForScope(scope);
     const scopeName = this.getScopeName(scope);
-    
+
     return {
       message: `The "${scopeName}" feature set is not available on your ${this.getPlanDisplayName(currentPlan)} plan.`,
       suggestion: `Upgrade to ${this.getPlanDisplayName(requiredPlan)} to access all ${scopeName} features.`,
@@ -88,10 +89,10 @@ class ErrorMessageService {
     };
   } {
     const { limitType, currentCount, maxAllowed, currentPlan } = params;
-    
+
     const limitName = this.getLimitDisplayName(limitType);
     const nextPlan = this.getNextPlan(currentPlan);
-    
+
     return {
       message: `You've reached your ${limitName} limit (${currentCount}/${maxAllowed}) on the ${this.getPlanDisplayName(currentPlan)} plan.`,
       suggestion: nextPlan
@@ -109,10 +110,7 @@ class ErrorMessageService {
   /**
    * Generate plan expired message
    */
-  getPlanExpiredMessage(params: {
-    plan: PlanSlug;
-    expiredAt: Date;
-  }): {
+  getPlanExpiredMessage(params: { plan: PlanSlug; expiredAt: Date }): {
     message: string;
     suggestion: string;
     renewUrl: string;
@@ -122,10 +120,11 @@ class ErrorMessageService {
     const daysExpired = Math.floor(
       (Date.now() - new Date(expiredAt).getTime()) / (1000 * 60 * 60 * 24)
     );
-    
+
     return {
       message: `Your ${this.getPlanDisplayName(plan)} subscription expired ${daysExpired} day${daysExpired !== 1 ? 's' : ''} ago.`,
-      suggestion: 'Renew your subscription to continue accessing premium features.',
+      suggestion:
+        'Renew your subscription to continue accessing premium features.',
       renewUrl: `/plans/renew?plan=${plan}`,
       daysExpired,
     };
@@ -144,7 +143,7 @@ class ErrorMessageService {
     helpUrl: string;
   } {
     const { resourceType, reason } = params;
-    
+
     return {
       message: `Access denied to ${resourceType}. ${reason}`,
       suggestion: this.getAccessDeniedSuggestion(reason),
@@ -168,7 +167,7 @@ class ErrorMessageService {
     const { limit, windowMs, retryAfter } = params;
     const windowMinutes = Math.floor(windowMs / 60000);
     const retryAt = new Date(Date.now() + retryAfter * 1000);
-    
+
     return {
       message: `Rate limit exceeded. You can make ${limit} requests per ${windowMinutes} minute${windowMinutes !== 1 ? 's' : ''}.`,
       suggestion: `Please wait ${Math.ceil(retryAfter / 60)} minute${Math.ceil(retryAfter / 60) !== 1 ? 's' : ''} before trying again.`,
@@ -220,7 +219,8 @@ class ErrorMessageService {
    */
   private getMinimumPlanForScope(scope: PermissionScope): PlanSlug {
     if (scope.includes('admin')) return PlanSlug.Premium;
-    if (scope.includes('advanced') || scope.includes('full')) return PlanSlug.Pro;
+    if (scope.includes('advanced') || scope.includes('full'))
+      return PlanSlug.Pro;
     return PlanSlug.Free;
   }
 
@@ -280,7 +280,9 @@ class ErrorMessageService {
   private getNextPlan(currentPlan: PlanSlug): PlanSlug | null {
     const hierarchy = [PlanSlug.Free, PlanSlug.Pro, PlanSlug.Premium];
     const currentIndex = hierarchy.indexOf(currentPlan);
-    return currentIndex < hierarchy.length - 1 ? hierarchy[currentIndex + 1] : null;
+    return currentIndex < hierarchy.length - 1
+      ? hierarchy[currentIndex + 1]
+      : null;
   }
 
   /**

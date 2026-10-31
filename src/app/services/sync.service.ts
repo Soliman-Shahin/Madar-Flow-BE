@@ -25,23 +25,37 @@ const stableCanonicalize = (value: any): any => {
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) return value.map(stableCanonicalize);
   if (value && typeof value === 'object') {
-    return Object.keys(value).sort().reduce((result: Record<string, unknown>, key) => {
-      result[key] = stableCanonicalize(value[key]);
-      return result;
-    }, {});
+    return Object.keys(value)
+      .sort()
+      .reduce((result: Record<string, unknown>, key) => {
+        result[key] = stableCanonicalize(value[key]);
+        return result;
+      }, {});
   }
   return value;
 };
 
 const mutationFingerprint = (entity: any): string => {
   const data = Object.keys(entity)
-    .filter((key) => !['_operationId', '_operationType', '_receiptId', '_retryCount', '_maxRetries', '_syncError'].includes(key))
+    .filter(
+      (key) =>
+        ![
+          '_operationId',
+          '_operationType',
+          '_receiptId',
+          '_retryCount',
+          '_maxRetries',
+          '_syncError',
+        ].includes(key)
+    )
     .sort()
     .reduce((result: Record<string, unknown>, key) => {
       result[key] = entity[key];
       return result;
     }, {});
-  return createHash('sha256').update(JSON.stringify(stableCanonicalize(data))).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify(stableCanonicalize(data)))
+    .digest('hex');
 };
 
 export interface SyncRequest {
@@ -262,12 +276,24 @@ export class SyncService {
         let processingEntity = entity;
         try {
           const registration = await this.registerOperation(userId, entity);
-          const requestedOperationType = entity._operationType || (entity._isDeleted ? 'DELETE' : entity._baseVersion != null ? 'UPDATE' : 'CREATE');
-          if (!registration && ['UPDATE', 'DELETE'].includes(requestedOperationType)) {
+          const requestedOperationType =
+            entity._operationType ||
+            (entity._isDeleted
+              ? 'DELETE'
+              : entity._baseVersion != null
+                ? 'UPDATE'
+                : 'CREATE');
+          if (
+            !registration &&
+            ['UPDATE', 'DELETE'].includes(requestedOperationType)
+          ) {
             const result = await this.processEntity(userId, entity, idMap);
             if (result.conflict) {
               conflicts.push(result.entity);
-              const conflictId = await this.recordConflict(userId, result.entity);
+              const conflictId = await this.recordConflict(
+                userId,
+                result.entity
+              );
               result.entity.conflictId = conflictId;
             } else {
               throw new Error('SYNC_REGISTRATION_REQUIRED');
@@ -277,8 +303,13 @@ export class SyncService {
           processingEntity = registration
             ? { ...entity, _receiptId: registration.receiptId }
             : entity;
-          if (registration) receipts[registration.clientOperationId] = registration.receiptId;
-          const result = await this.processEntity(userId, processingEntity, idMap);
+          if (registration)
+            receipts[registration.clientOperationId] = registration.receiptId;
+          const result = await this.processEntity(
+            userId,
+            processingEntity,
+            idMap
+          );
 
           if (result.conflict) {
             conflicts.push(result.entity);
@@ -326,7 +357,8 @@ export class SyncService {
     userId: string,
     entity: any
   ): Promise<void> {
-    const receiptId = typeof entity._receiptId === 'string' ? entity._receiptId : '';
+    const receiptId =
+      typeof entity._receiptId === 'string' ? entity._receiptId : '';
     const operationId =
       typeof entity._operationId === 'string' ? entity._operationId.trim() : '';
     const entityType = String(entity._entityType || 'unknown');
@@ -348,15 +380,24 @@ export class SyncService {
         receiptId,
         clientOperationId: operationId,
       }).lean();
-      if (!registration || registration.entityType !== entityType || registration.entityId !== entityId) return;
+      if (
+        !registration ||
+        registration.entityType !== entityType ||
+        registration.entityId !== entityId
+      )
+        return;
       const identityFilter = {
         user: new mongoose.Types.ObjectId(userId),
         registrationId: registration.receiptId,
       };
       let existing = await SyncFailure.findOne(identityFilter).lean();
       let reclaimed = false;
-      if (existing?.terminal && existing.dispatchState === 'dispatching' &&
-        existing.updatedAt && Date.now() - new Date(existing.updatedAt).getTime() > 5 * 60 * 1000) {
+      if (
+        existing?.terminal &&
+        existing.dispatchState === 'dispatching' &&
+        existing.updatedAt &&
+        Date.now() - new Date(existing.updatedAt).getTime() > 5 * 60 * 1000
+      ) {
         const reclaim = await SyncFailure.updateOne(
           { _id: existing._id, terminal: true, dispatchState: 'dispatching' },
           { $set: { terminal: false, dispatchState: 'pending' } }
@@ -401,7 +442,11 @@ export class SyncService {
         }
       }
 
-      if (!failure || failure.terminal || failure.attemptCount < REPEATED_FAILURE_THRESHOLD)
+      if (
+        !failure ||
+        failure.terminal ||
+        failure.attemptCount < REPEATED_FAILURE_THRESHOLD
+      )
         return;
 
       const terminal = await SyncFailure.findOneAndUpdate(
@@ -421,7 +466,10 @@ export class SyncService {
     }
   }
 
-  private async dispatchRepeatedFailure(userId: string, failure: any): Promise<void> {
+  private async dispatchRepeatedFailure(
+    userId: string,
+    failure: any
+  ): Promise<void> {
     const claimed = await SyncFailure.findOneAndUpdate(
       { _id: failure._id, terminal: false, dispatchState: 'pending' },
       { $set: { terminal: true, dispatchState: 'dispatching' } },
@@ -434,7 +482,8 @@ export class SyncService {
         event: 'sync.repeated_failure',
         dedupeKey: `${userId}:sync-repeated-failure:${dispatching.registrationId}`,
         title: 'Sync repeatedly failed / فشلت المزامنة عدة مرات',
-        message: 'A change could not be synchronized after several attempts. / تعذر مزامنة تغيير بعد عدة محاولات.',
+        message:
+          'A change could not be synchronized after several attempts. / تعذر مزامنة تغيير بعد عدة محاولات.',
         metadata: {
           operationId: dispatching.operationId,
           registrationId: dispatching.registrationId,
@@ -457,52 +506,119 @@ export class SyncService {
   }
 
   private async registerOperation(userId: string, entity: any) {
-    const operationId = typeof entity._operationId === 'string' ? entity._operationId.trim() : '';
-    const operationType = entity._operationType || (entity._isDeleted ? 'DELETE' : entity._baseVersion != null ? 'UPDATE' : 'CREATE');
+    const operationId =
+      typeof entity._operationId === 'string' ? entity._operationId.trim() : '';
+    const operationType =
+      entity._operationType ||
+      (entity._isDeleted
+        ? 'DELETE'
+        : entity._baseVersion != null
+          ? 'UPDATE'
+          : 'CREATE');
     const entityType = String(entity._entityType || '');
     const entityId = String(entity._id || '');
-    if (!OPERATION_ID_PATTERN.test(operationId) || !['CREATE', 'UPDATE', 'DELETE'].includes(operationType) || !['expense', 'outcome', 'category'].includes(entityType) || !entityId || entityId.length > 200) return null;
+    if (
+      !OPERATION_ID_PATTERN.test(operationId) ||
+      !['CREATE', 'UPDATE', 'DELETE'].includes(operationType) ||
+      !['expense', 'outcome', 'category'].includes(entityType) ||
+      !entityId ||
+      entityId.length > 200
+    )
+      return null;
     const fingerprint = mutationFingerprint(entity);
     const userObjectId = new mongoose.Types.ObjectId(userId);
     if (entity._receiptId) {
-      const receipt = await SyncRegistration.findOne({ receiptId: entity._receiptId }).lean();
-      if (!receipt || String(receipt.user) !== String(userObjectId)) throw new Error('SYNC_RECEIPT_MISMATCH');
-      if (receipt.clientOperationId !== operationId || receipt.entityType !== entityType || receipt.entityId !== entityId || receipt.operationType !== operationType || receipt.fingerprint !== fingerprint) throw new Error('SYNC_RECEIPT_MISMATCH');
+      const receipt = await SyncRegistration.findOne({
+        receiptId: entity._receiptId,
+      }).lean();
+      if (!receipt || String(receipt.user) !== String(userObjectId))
+        throw new Error('SYNC_RECEIPT_MISMATCH');
+      if (
+        receipt.clientOperationId !== operationId ||
+        receipt.entityType !== entityType ||
+        receipt.entityId !== entityId ||
+        receipt.operationType !== operationType ||
+        receipt.fingerprint !== fingerprint
+      )
+        throw new Error('SYNC_RECEIPT_MISMATCH');
     }
-    const existing = await SyncRegistration.findOne({ user: userObjectId, clientOperationId: operationId }).lean();
+    const existing = await SyncRegistration.findOne({
+      user: userObjectId,
+      clientOperationId: operationId,
+    }).lean();
     if (existing) {
-      if ((entity._receiptId && entity._receiptId !== existing.receiptId) || existing.entityType !== entityType || existing.entityId !== entityId || existing.operationType !== operationType || existing.fingerprint !== fingerprint) throw new Error('SYNC_RECEIPT_MISMATCH');
+      if (
+        (entity._receiptId && entity._receiptId !== existing.receiptId) ||
+        existing.entityType !== entityType ||
+        existing.entityId !== entityId ||
+        existing.operationType !== operationType ||
+        existing.fingerprint !== fingerprint
+      )
+        throw new Error('SYNC_RECEIPT_MISMATCH');
       return existing;
     }
     if (operationType !== 'CREATE') {
       const Model: any = entityType === 'category' ? Category : Expense;
-      const owned = await Model.findOne({ _id: entityId, user: userObjectId }).select('_version').lean();
+      const owned = await Model.findOne({ _id: entityId, user: userObjectId })
+        .select('_version')
+        .lean();
       if (!owned) throw new Error('SYNC_REGISTRATION_REQUIRED');
-      if (entity._baseVersion != null && owned._version !== entity._baseVersion) return null;
+      if (entity._baseVersion != null && owned._version !== entity._baseVersion)
+        return null;
     }
     try {
       return await SyncRegistration.findOneAndUpdate(
         { user: userObjectId, clientOperationId: operationId },
-        { $setOnInsert: { receiptId: randomUUID(), user: userObjectId, clientOperationId: operationId, operationType, entityType, entityId, baseVersion: entity._baseVersion, fingerprint, state: 'registered' } },
+        {
+          $setOnInsert: {
+            receiptId: randomUUID(),
+            user: userObjectId,
+            clientOperationId: operationId,
+            operationType,
+            entityType,
+            entityId,
+            baseVersion: entity._baseVersion,
+            fingerprint,
+            state: 'registered',
+          },
+        },
         { upsert: true, returnDocument: 'after' }
       ).lean();
     } catch (error: any) {
       if (error?.code === 11000) {
-        const winner = await SyncRegistration.findOne({ user: userObjectId, clientOperationId: operationId }).lean();
-        if (!winner || winner.operationType !== operationType || winner.entityType !== entityType || winner.entityId !== entityId || winner.baseVersion !== entity._baseVersion || winner.fingerprint !== fingerprint) throw new Error('SYNC_RECEIPT_MISMATCH');
+        const winner = await SyncRegistration.findOne({
+          user: userObjectId,
+          clientOperationId: operationId,
+        }).lean();
+        if (
+          !winner ||
+          winner.operationType !== operationType ||
+          winner.entityType !== entityType ||
+          winner.entityId !== entityId ||
+          winner.baseVersion !== entity._baseVersion ||
+          winner.fingerprint !== fingerprint
+        )
+          throw new Error('SYNC_RECEIPT_MISMATCH');
         return winner;
       }
       throw error;
     }
   }
 
-  private async clearObservedFailure(userId: string, entity: any): Promise<void> {
+  private async clearObservedFailure(
+    userId: string,
+    entity: any
+  ): Promise<void> {
     const entityType = String(entity._entityType || 'unknown');
     const entityId = String(entity._id || entity._clientId || 'unknown');
-    if (!['expense', 'outcome', 'category'].includes(entityType) || !entityId) return;
+    if (!['expense', 'outcome', 'category'].includes(entityType) || !entityId)
+      return;
     if (typeof entity._receiptId === 'string') {
       await SyncRegistration.updateOne(
-        { user: new mongoose.Types.ObjectId(userId), receiptId: entity._receiptId },
+        {
+          user: new mongoose.Types.ObjectId(userId),
+          receiptId: entity._receiptId,
+        },
         { $set: { state: 'completed' } }
       );
     }
@@ -607,10 +723,18 @@ export class SyncService {
 
       // Never trust ownership/identity fields from the client: `user` would let a caller
       // move an entity into another account, and a foreign `category` leaks it via populate.
-      for (const protectedField of ['user', '_id', '__v']) delete entityData[protectedField];
-      if (_entityType !== 'category' && entityData.category !== undefined && entityData.category !== null) {
+      for (const protectedField of ['user', '_id', '__v'])
+        delete entityData[protectedField];
+      if (
+        _entityType !== 'category' &&
+        entityData.category !== undefined &&
+        entityData.category !== null
+      ) {
         // Pulled expenses carry a populated category object; clients echo it back.
-        const categoryRef =  typeof entityData.category === 'object' ? entityData.category._id : entityData.category;
+        const categoryRef =
+          typeof entityData.category === 'object'
+            ? entityData.category._id
+            : entityData.category;
         const owned =
           mongoose.Types.ObjectId.isValid(categoryRef) &&
           (await Category.exists({ _id: categoryRef, user: userId }));
@@ -921,7 +1045,11 @@ export class SyncService {
         if (!priorResolution || priorResolution.resolution !== resolution)
           throw new Error('Conflict already resolved with a different choice');
         await SyncConflict.updateOne(
-          { _id: conflict._id, user: userObjectId, resolvedAt: { $exists: false } },
+          {
+            _id: conflict._id,
+            user: userObjectId,
+            resolvedAt: { $exists: false },
+          },
           { $set: { resolvedAt: new Date(), resolutionState: 'resolved' } }
         );
         const resolvedEntity = await Model.findOne({
@@ -946,10 +1074,13 @@ export class SyncService {
             { resolutionState: 'resolving', claimedResolution: resolution },
           ],
         },
-        { $set: { resolutionState: 'resolving', claimedResolution: resolution } },
+        {
+          $set: { resolutionState: 'resolving', claimedResolution: resolution },
+        },
         { returnDocument: 'after' }
       ).lean();
-      if (!claimed) throw new Error('Conflict already claimed with a different choice');
+      if (!claimed)
+        throw new Error('Conflict already claimed with a different choice');
       const entity = await Model.findOne({ _id: entityId, user: userObjectId });
       if (!entity) throw new Error('Entity not found');
       const expectedVersion = Number(conflict.serverData?._version);
@@ -989,7 +1120,8 @@ export class SyncService {
       // revision. Local and Merge intentionally mutate the entity and advance it.
       const entityAlreadyApplied =
         resolution !== 'server' &&
-        String((entity as any)._resolutionConflictId || '') === String(conflict._id) &&
+        String((entity as any)._resolutionConflictId || '') ===
+          String(conflict._id) &&
         Number(entity._version) === expectedVersion + 1;
       const updateResult =
         resolution === 'server'
@@ -998,24 +1130,32 @@ export class SyncService {
               { $set: { _version: expectedVersion } }
             )
           : entityAlreadyApplied
-          ? { matchedCount: 1 }
-          : await Model.updateOne(
-              { _id: entityId, user: userObjectId, _version: expectedVersion },
-              {
-                $set: {
-                  ...writableData,
-                  _syncStatus: 'synced',
-                  _lastModified: new Date(),
-                  _version: expectedVersion + 1,
-                  _resolutionConflictId: String(conflict._id),
+            ? { matchedCount: 1 }
+            : await Model.updateOne(
+                {
+                  _id: entityId,
+                  user: userObjectId,
+                  _version: expectedVersion,
                 },
-                $unset: { _conflictData: 1 },
-              }
-            );
+                {
+                  $set: {
+                    ...writableData,
+                    _syncStatus: 'synced',
+                    _lastModified: new Date(),
+                    _version: expectedVersion + 1,
+                    _resolutionConflictId: String(conflict._id),
+                  },
+                  $unset: { _conflictData: 1 },
+                }
+              );
       if (updateResult.matchedCount !== 1)
         throw new Error('SYNC_CONFLICT_STALE_RESOLUTION');
       await SyncConflict.updateOne(
-        { _id: conflict._id, user: userObjectId, resolvedAt: { $exists: false } },
+        {
+          _id: conflict._id,
+          user: userObjectId,
+          resolvedAt: { $exists: false },
+        },
         {
           $set: {
             appliedRevision:

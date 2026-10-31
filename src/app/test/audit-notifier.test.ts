@@ -15,8 +15,13 @@ describe('auditAndNotifyStaff', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('logs the audit entry and sends it to staff rooms only, carrying the audit id', async () => {
-    jest.spyOn(auditLogService, 'log').mockResolvedValue({ _id: { toString: () => 'audit-1' } } as any);
-    const fake = { broadcastToStaff: jest.fn(), broadcastNotification: jest.fn() };
+    jest
+      .spyOn(auditLogService, 'log')
+      .mockResolvedValue({ _id: { toString: () => 'audit-1' } } as any);
+    const fake = {
+      broadcastToStaff: jest.fn(),
+      broadcastNotification: jest.fn(),
+    };
     jest.spyOn(socketModule, 'getSocketService').mockReturnValue(fake as any);
 
     await auditAndNotifyStaff({ ...base, actorId: 'u1', actorEmail: 'a@b.c' });
@@ -37,12 +42,18 @@ describe('auditAndNotifyStaff', () => {
     const fake = { broadcastToStaff: jest.fn() };
     jest.spyOn(socketModule, 'getSocketService').mockReturnValue(fake as any);
     await expect(auditAndNotifyStaff(base)).resolves.toBeUndefined();
-    expect(fake.broadcastToStaff).toHaveBeenCalledWith(expect.objectContaining({ auditLogId: undefined }));
+    expect(fake.broadcastToStaff).toHaveBeenCalledWith(
+      expect.objectContaining({ auditLogId: undefined })
+    );
   });
 
   it('does not throw when the socket service is unavailable', async () => {
-    jest.spyOn(auditLogService, 'log').mockResolvedValue({ _id: { toString: () => 'a' } } as any);
-    jest.spyOn(socketModule, 'getSocketService').mockImplementation(() => { throw new Error('not initialized'); });
+    jest
+      .spyOn(auditLogService, 'log')
+      .mockResolvedValue({ _id: { toString: () => 'a' } } as any);
+    jest.spyOn(socketModule, 'getSocketService').mockImplementation(() => {
+      throw new Error('not initialized');
+    });
     await expect(auditAndNotifyStaff(base)).resolves.toBeUndefined();
   });
 });

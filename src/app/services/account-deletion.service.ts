@@ -151,7 +151,11 @@ export class AccountDeletionService {
     ipAddress?: string
   ): Promise<void> {
     if (!isTokenShape(token))
-      throw new AccountDeletionError('Invalid or expired link', 400, 'INVALID_TOKEN');
+      throw new AccountDeletionError(
+        'Invalid or expired link',
+        400,
+        'INVALID_TOKEN'
+      );
     const user = await User.findOneAndUpdate(
       {
         accountDeletionTokenHash: hashToken(token),
@@ -159,11 +163,17 @@ export class AccountDeletionService {
         _isDeleted: { $ne: true },
         role: UserRole.User,
       },
-      { $unset: { accountDeletionTokenHash: '', accountDeletionExpiresAt: '' } },
+      {
+        $unset: { accountDeletionTokenHash: '', accountDeletionExpiresAt: '' },
+      },
       { projection: { _id: 1 } }
     );
     if (!user)
-      throw new AccountDeletionError('Invalid or expired link', 400, 'INVALID_TOKEN');
+      throw new AccountDeletionError(
+        'Invalid or expired link',
+        400,
+        'INVALID_TOKEN'
+      );
     await this.purge(user._id as Types.ObjectId, ipAddress, 'web');
   }
 

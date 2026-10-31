@@ -29,7 +29,11 @@ export const createExpense = async (req: CustomRequest, res: Response) => {
 };
 
 /** Query numbers are clamped; junk or negative values must not reach MongoDB (that was a 500). */
-function boundedInt(raw: unknown, min: number, max: number): number | undefined {
+function boundedInt(
+  raw: unknown,
+  min: number,
+  max: number
+): number | undefined {
   if (raw === undefined || raw === '') return undefined;
   const n = Number.parseInt(String(raw), 10);
   if (!Number.isFinite(n)) return undefined;

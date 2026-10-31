@@ -6,7 +6,7 @@ import logger from './logger.service';
 
 /**
  * Permission Cache Service
- * 
+ *
  * Caches user permissions and plan contexts to reduce database queries.
  * Uses in-memory caching with TTL (Time To Live) for automatic expiration.
  */
@@ -78,7 +78,10 @@ class PermissionCacheService {
   /**
    * Check if user has a specific permission (cached)
    */
-  async hasPermission(userId: string, permission: Permission): Promise<boolean> {
+  async hasPermission(
+    userId: string,
+    permission: Permission
+  ): Promise<boolean> {
     const permissions = await this.getUserPermissions(userId);
     return permissions.includes(permission);
   }
@@ -136,10 +139,10 @@ class PermissionCacheService {
   async invalidatePlan(planSlug: string): Promise<void> {
     // Get all cache keys
     const keys = this.cache.keys();
-    
+
     // Filter keys related to this plan (we'll need to check each cached value)
     const keysToDelete: string[] = [];
-    
+
     keys.forEach((key) => {
       if (key.startsWith('plan_context:')) {
         const cached = this.cache.get<UserPlanContext>(key);
@@ -151,7 +154,9 @@ class PermissionCacheService {
 
     // Delete all matching keys
     this.cache.del(keysToDelete);
-    logger.info(`Invalidated cache for plan ${planSlug}: ${keysToDelete.length} users`);
+    logger.info(
+      `Invalidated cache for plan ${planSlug}: ${keysToDelete.length} users`
+    );
   }
 
   /**
@@ -194,8 +199,8 @@ class PermissionCacheService {
     const stats = this.getStats();
     logger.debug(
       `Permission Cache Stats: ${stats.keys} keys, ` +
-      `${stats.hits} hits, ${stats.misses} misses, ` +
-      `${stats.hitRate}% hit rate`
+        `${stats.hits} hits, ${stats.misses} misses, ` +
+        `${stats.hitRate}% hit rate`
     );
   }
 
@@ -205,7 +210,7 @@ class PermissionCacheService {
   setUserTTL(userId: string, ttl: number): void {
     const key = this.getPlanContextKey(userId);
     const cached = this.cache.get<UserPlanContext>(key);
-    
+
     if (cached) {
       this.cache.set(key, cached, ttl);
       logger.debug(`Updated TTL for ${key} to ${ttl} seconds`);
@@ -217,10 +222,12 @@ class PermissionCacheService {
    */
   async warmUp(userIds: string[]): Promise<void> {
     logger.info(`Warming up cache for ${userIds.length} users...`);
-    
+
     const promises = userIds.map((userId) =>
       this.getUserPlanContext(userId).catch((err) => {
-        logger.warn(`Failed to warm up cache for user ${userId}: ${err.message}`);
+        logger.warn(
+          `Failed to warm up cache for user ${userId}: ${err.message}`
+        );
       })
     );
 

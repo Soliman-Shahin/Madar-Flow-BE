@@ -5,7 +5,7 @@ import logger from '../services/logger.service';
 
 /**
  * Cache Controller
- * 
+ *
  * Handles HTTP requests for cache management and statistics
  */
 class CacheController {
@@ -19,7 +19,12 @@ class CacheController {
       sendSuccess(res, stats, 'Cache statistics retrieved successfully');
     } catch (error: any) {
       logger.error('Error getting cache stats:', error.message);
-      sendError(res, 'Failed to retrieve cache statistics', 500, 'INTERNAL_ERROR');
+      sendError(
+        res,
+        'Failed to retrieve cache statistics',
+        500,
+        'INTERNAL_ERROR'
+      );
     }
   }
 
@@ -83,7 +88,9 @@ class CacheController {
   async invalidatePlan(req: Request, res: Response): Promise<void> {
     try {
       const rawPlanSlug = req.params.planSlug;
-      const planSlug = Array.isArray(rawPlanSlug) ? rawPlanSlug[0] : rawPlanSlug;
+      const planSlug = Array.isArray(rawPlanSlug)
+        ? rawPlanSlug[0]
+        : rawPlanSlug;
 
       await permissionCacheService.invalidatePlan(planSlug);
 
@@ -106,11 +113,7 @@ class CacheController {
     try {
       permissionCacheService.flush();
 
-      sendSuccess(
-        res,
-        { flushed: true },
-        'Cache completely flushed'
-      );
+      sendSuccess(res, { flushed: true }, 'Cache completely flushed');
     } catch (error: any) {
       logger.error('Error flushing cache:', error.message);
       sendError(res, 'Failed to flush cache', 500, 'INTERNAL_ERROR');

@@ -12,7 +12,10 @@ export class ExpenseService {
   /** An expense may only reference a category owned by the same user (populate would otherwise leak it). */
   private static async assertOwnCategory(categoryId: unknown, userId: string) {
     if (categoryId === undefined || categoryId === null) return;
-    if (!mongoose.isValidObjectId(categoryId) || !(await Category.exists({ _id: categoryId as any, user: userId }))) {
+    if (
+      !mongoose.isValidObjectId(categoryId) ||
+      !(await Category.exists({ _id: categoryId as any, user: userId }))
+    ) {
       throw new BadRequestError('Category not found');
     }
   }
@@ -36,12 +39,12 @@ export class ExpenseService {
       notification: {
         title: 'Expense Created',
         message: `A new expense was created.`,
-        type: 'success'
+        type: 'success',
       },
       changes: data,
       targetUserId: userId,
       targetResourceType: 'Expense',
-      targetResourceId: saved._id.toString()
+      targetResourceId: saved._id.toString(),
     });
 
     return saved;
@@ -195,7 +198,12 @@ export class ExpenseService {
     }).populate('category');
   }
 
-  static async updateExpense(id: string, data: any, userId: string, req?: Request) {
+  static async updateExpense(
+    id: string,
+    data: any,
+    userId: string,
+    req?: Request
+  ) {
     await this.assertOwnCategory(data?.category, userId);
     const expense = await Expense.findOne({ _id: id, user: userId });
     if (!expense) return null;
@@ -220,12 +228,12 @@ export class ExpenseService {
       notification: {
         title: 'Expense Updated',
         message: `An expense was updated.`,
-        type: 'info'
+        type: 'info',
       },
       changes: data,
       targetUserId: userId,
       targetResourceType: 'Expense',
-      targetResourceId: id
+      targetResourceId: id,
     });
 
     return updated;
@@ -250,11 +258,11 @@ export class ExpenseService {
       notification: {
         title: 'Expense Deleted',
         message: `An expense was deleted.`,
-        type: 'warn'
+        type: 'warn',
       },
       targetUserId: userId,
       targetResourceType: 'Expense',
-      targetResourceId: id
+      targetResourceId: id,
     });
 
     return deleted;

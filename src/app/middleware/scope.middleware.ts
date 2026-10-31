@@ -1,28 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/helper';
 import { PlanRequest } from './permission.middleware';
-import { PermissionScope, hasScope, hasAnyScope, hasAllScopes } from '../types/permission-scopes.types';
+import {
+  PermissionScope,
+  hasScope,
+  hasAnyScope,
+  hasAllScopes,
+} from '../types/permission-scopes.types';
 import { errorMessageService } from '../services/error-message.service';
 import logger from '../services/logger.service';
 
 /**
  * Scope Middleware
- * 
+ *
  * Higher-level permission checks using scopes instead of individual permissions.
  * Scopes group related permissions for easier management.
  */
 
 /**
  * requireScope
- * 
+ *
  * Middleware factory that checks if the user has a specific permission scope.
  * A scope is a logical grouping of related permissions.
- * 
+ *
  * IMPORTANT: Must be used AFTER `verifyAccessToken` AND `attachPlanContext`.
- * 
+ *
  * @param scope - The required permission scope
  * @returns Express middleware
- * 
+ *
  * @example
  * router.post('/export', verifyAccessToken, attachPlanContext, requireScope(PermissionScope.EXPENSES_FULL), handler)
  */
@@ -63,30 +68,22 @@ export const requireScope = (scope: PermissionScope) => {
         logger.warn(
           `Scope denied: user=${planReq.user_id} plan=${planSlug} missing=${scope}`
         );
-        
+
         const errorDetails = errorMessageService.getScopeDeniedMessage({
           scope,
           currentPlan: planSlug,
         });
-        
-        return sendError(
-          res,
-          errorDetails.message,
-          403,
-          'SCOPE_DENIED',
-          {
-            scope,
-            currentPlan: planSlug,
-            requiredPlan: errorDetails.requiredPlan,
-            suggestion: errorDetails.suggestion,
-            upgradeUrl: errorDetails.upgradeUrl,
-          }
-        );
+
+        return sendError(res, errorDetails.message, 403, 'SCOPE_DENIED', {
+          scope,
+          currentPlan: planSlug,
+          requiredPlan: errorDetails.requiredPlan,
+          suggestion: errorDetails.suggestion,
+          upgradeUrl: errorDetails.upgradeUrl,
+        });
       }
 
-      logger.debug(
-        `Scope granted: user=${planReq.user_id} scope=${scope}`
-      );
+      logger.debug(`Scope granted: user=${planReq.user_id} scope=${scope}`);
       next();
     } catch (error: any) {
       logger.error('Error in requireScope middleware:', error.message);
@@ -102,10 +99,10 @@ export const requireScope = (scope: PermissionScope) => {
 
 /**
  * requireAnyScope
- * 
+ *
  * Grants access if the user has AT LEAST ONE of the listed scopes.
  * Useful for resources that can be accessed by multiple feature sets.
- * 
+ *
  * @param scopes - Array of acceptable scopes (OR logic)
  */
 export const requireAnyScope = (scopes: PermissionScope[]) => {
@@ -161,10 +158,10 @@ export const requireAnyScope = (scopes: PermissionScope[]) => {
 
 /**
  * requireAllScopes
- * 
+ *
  * Grants access only if the user has ALL of the listed scopes.
  * Useful for operations that require multiple feature sets.
- * 
+ *
  * @param scopes - Array of required scopes (AND logic)
  */
 export const requireAllScopes = (scopes: PermissionScope[]) => {

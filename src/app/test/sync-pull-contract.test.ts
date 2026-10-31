@@ -14,7 +14,9 @@ async function signedInUser(label: string) {
     password: 'not-used',
   });
   await user.createSession();
-  const token = await (await User.findById(user._id))!.generateAccessAuthToken();
+  const token = await (await User.findById(
+    user._id
+  ))!.generateAccessAuthToken();
   return { user, token };
 }
 
@@ -29,8 +31,18 @@ async function seed(userId: Types.ObjectId, label: string) {
   } as any);
   const base = { user: userId, category: category._id, amount: 10, date: OLD };
   await Expense.create([
-    { ...base, _clientId: `old-${label}`, description: `old ${label}`, _lastModified: OLD },
-    { ...base, _clientId: `new-${label}`, description: `new ${label}`, _lastModified: NEW },
+    {
+      ...base,
+      _clientId: `old-${label}`,
+      description: `old ${label}`,
+      _lastModified: OLD,
+    },
+    {
+      ...base,
+      _clientId: `new-${label}`,
+      description: `new ${label}`,
+      _lastModified: NEW,
+    },
     {
       ...base,
       _clientId: `deleted-${label}`,
@@ -48,11 +60,16 @@ async function seed(userId: Types.ObjectId, label: string) {
     { user: userId, _lastModified: NEW },
     { $set: { createdAt: NEW, updatedAt: NEW } }
   );
-  await Category.collection.updateMany({ user: userId }, { $set: { createdAt: OLD, updatedAt: OLD } });
+  await Category.collection.updateMany(
+    { user: userId },
+    { $set: { createdAt: OLD, updatedAt: OLD } }
+  );
 }
 
 const pull = (token: string, query = '') =>
-  request(app).get(`/v1/sync/pull${query}`).set('Authorization', `Bearer ${token}`);
+  request(app)
+    .get(`/v1/sync/pull${query}`)
+    .set('Authorization', `Bearer ${token}`);
 
 describe('sync pull contract', () => {
   it('requires authentication', async () => {
@@ -60,7 +77,7 @@ describe('sync pull contract', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns only the caller\'s own entities, tagged with their type', async () => {
+  it("returns only the caller's own entities, tagged with their type", async () => {
     const a = await signedInUser('a');
     const b = await signedInUser('b');
     await seed(a.user._id as Types.ObjectId, 'a');
@@ -70,22 +87,39 @@ describe('sync pull contract', () => {
     expect(res.status).toBe(200);
     const entities = res.body.data.entities as any[];
     expect(entities.length).toBeGreaterThan(0);
-    expect(entities.every((e) => String(e.user?._id ?? e.user) === a.user._id.toString())).toBe(true);
-    expect(entities.some((e) => /\bb$/.test(e.description ?? e.title ?? ''))).toBe(false);
-    expect(new Set(entities.map((e) => e._entityType))).toEqual(new Set(['expense', 'category']));
+    expect(
+      entities.every(
+        (e) => String(e.user?._id ?? e.user) === a.user._id.toString()
+      )
+    ).toBe(true);
+    expect(
+      entities.some((e) => /\bb$/.test(e.description ?? e.title ?? ''))
+    ).toBe(false);
+    expect(new Set(entities.map((e) => e._entityType))).toEqual(
+      new Set(['expense', 'category'])
+    );
   });
 
   it('applies lastSyncTime and still includes deletions as tombstones', async () => {
     const a = await signedInUser('a');
     await seed(a.user._id as Types.ObjectId, 'a');
 
-    const res = await pull(a.token, `?lastSyncTime=${encodeURIComponent(CUTOFF)}`);
+    const res = await pull(
+      a.token,
+      `?lastSyncTime=${encodeURIComponent(CUTOFF)}`
+    );
     expect(res.status).toBe(200);
-    const descriptions = (res.body.data.entities as any[]).map((e) => e.description ?? e.title);
-    expect(descriptions).toEqual(expect.arrayContaining(['new a', 'deleted a']));
+    const descriptions = (res.body.data.entities as any[]).map(
+      (e) => e.description ?? e.title
+    );
+    expect(descriptions).toEqual(
+      expect.arrayContaining(['new a', 'deleted a'])
+    );
     expect(descriptions).not.toContain('old a');
     expect(descriptions).not.toContain('Cat a');
-    const tombstone = (res.body.data.entities as any[]).find((e) => e.description === 'deleted a');
+    const tombstone = (res.body.data.entities as any[]).find(
+      (e) => e.description === 'deleted a'
+    );
     expect(tombstone._isDeleted).toBe(true);
   });
 
@@ -95,7 +129,9 @@ describe('sync pull contract', () => {
 
     const res = await pull(a.token, '?entityType=category');
     expect(res.status).toBe(200);
-    const types = new Set((res.body.data.entities as any[]).map((e) => e._entityType));
+    const types = new Set(
+      (res.body.data.entities as any[]).map((e) => e._entityType)
+    );
     expect(types).toEqual(new Set(['category']));
   });
 

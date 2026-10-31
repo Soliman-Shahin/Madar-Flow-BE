@@ -12,7 +12,9 @@ export class TelemetryService {
     const docs = input.events.map((event) => {
       const ts = event.ts;
       const usable =
-        typeof ts === 'number' && ts >= t - MAX_PAST_MS && ts <= t + MAX_FUTURE_MS;
+        typeof ts === 'number' &&
+        ts >= t - MAX_PAST_MS &&
+        ts <= t + MAX_FUTURE_MS;
       return {
         installId: input.installId.toLowerCase(),
         name: event.name,
@@ -48,7 +50,13 @@ export class TelemetryService {
         {
           $group: {
             _id: {
-              day: { $dateToString: { format: '%Y-%m-%d', date: '$at', timezone: 'UTC' } },
+              day: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$at',
+                  timezone: 'UTC',
+                },
+              },
               name: '$name',
             },
             count: { $sum: 1 },
@@ -74,7 +82,10 @@ export class TelemetryService {
       optedInInstalls: installs.length,
       installsWithTransaction: activated.length,
       totals: Object.fromEntries(
-        totals.map((row: { _id: string; count: number }) => [row._id, row.count])
+        totals.map((row: { _id: string; count: number }) => [
+          row._id,
+          row.count,
+        ])
       ),
       perDay: perDay.map(
         (row: { _id: { day: string; name: string }; count: number }) => ({

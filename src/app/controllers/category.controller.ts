@@ -19,7 +19,11 @@ const createCategory = async (
 ) => {
   try {
     const userId = req.user_id as string;
-    const category = await CategoryService.createCategory(req.body, userId, req);
+    const category = await CategoryService.createCategory(
+      req.body,
+      userId,
+      req
+    );
     sendSuccess(res, category, 'Category created successfully', 201);
   } catch (error: any) {
     // Propagate AppError subclasses (PlanLimitError, etc.) with correct status code
@@ -76,7 +80,12 @@ const updateCategory = async (
   try {
     const id = req.params.id as string;
     const userId = req.user_id as string;
-    const category = await CategoryService.updateCategory(id, req.body, userId, req);
+    const category = await CategoryService.updateCategory(
+      id,
+      req.body,
+      userId,
+      req
+    );
     if (!category) {
       return sendError(res, 'Category not found', 404);
     }

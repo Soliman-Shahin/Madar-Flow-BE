@@ -57,11 +57,20 @@ const adminOrAbove = requireRole(UserRole.Admin, UserRole.SuperAdmin);
  * SuperAdmin may change or delete them or flag a role as "system" (D-021: an Admin must not
  * be able to grant their own role more permissions).
  */
-const protectSystemRoles = async (req: Request, res: Response, next: NextFunction) => {
+const protectSystemRoles = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const actorRole = (req as any).user?.role as UserRole | undefined;
   if (actorRole === UserRole.SuperAdmin) return next();
   const forbid = () =>
-    sendError(res, 'Only a superadmin can change system roles', 403, 'SYSTEM_ROLE_PROTECTED');
+    sendError(
+      res,
+      'Only a superadmin can change system roles',
+      403,
+      'SYSTEM_ROLE_PROTECTED'
+    );
   if (req.body && 'isSystem' in req.body) {
     if (req.body.isSystem) return forbid();
     delete req.body.isSystem;
@@ -94,6 +103,11 @@ router.put(
   validateRequestWithZod(updateRoleSchema),
   roleController.updateRole
 );
-router.delete('/:id', adminOrAbove, protectSystemRoles, roleController.deleteRole);
+router.delete(
+  '/:id',
+  adminOrAbove,
+  protectSystemRoles,
+  roleController.deleteRole
+);
 
 export default router;

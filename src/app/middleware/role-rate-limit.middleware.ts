@@ -8,7 +8,7 @@ import logger from '../services/logger.service';
 
 /**
  * Role-Based Rate Limiting Middleware
- * 
+ *
  * Applies different rate limits based on user role.
  * Higher roles get more generous limits.
  */
@@ -17,9 +17,9 @@ import logger from '../services/logger.service';
  * Rate limit configuration per role
  */
 interface RoleLimitConfig {
-  windowMs: number;  // Time window in milliseconds
-  max: number;       // Maximum requests per window
-  message?: string;  // Custom error message
+  windowMs: number; // Time window in milliseconds
+  max: number; // Maximum requests per window
+  message?: string; // Custom error message
 }
 
 /**
@@ -28,25 +28,25 @@ interface RoleLimitConfig {
 const DEFAULT_ROLE_LIMITS: Record<UserRole, RoleLimitConfig> = {
   [UserRole.User]: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,                  // 100 requests per 15 minutes
+    max: 100, // 100 requests per 15 minutes
   },
   [UserRole.Moderator]: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 300,                  // 300 requests per 15 minutes
+    max: 300, // 300 requests per 15 minutes
   },
   [UserRole.Admin]: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500,                  // 500 requests per 15 minutes
+    max: 500, // 500 requests per 15 minutes
   },
   [UserRole.SuperAdmin]: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 1000,                 // 1000 requests per 15 minutes (almost unlimited)
+    max: 1000, // 1000 requests per 15 minutes (almost unlimited)
   },
 };
 
 /**
  * Create a role-based rate limiter
- * 
+ *
  * @param customLimits - Optional custom limits per role
  * @returns Express middleware
  */
@@ -57,14 +57,14 @@ export const createRoleBasedRateLimiter = (
 
   return rateLimit({
     windowMs: 15 * 60 * 1000, // Default window (will be overridden per user)
-    max: 100,                  // Default max (will be overridden per user)
-    
+    max: 100, // Default max (will be overridden per user)
+
     // Use user ID as key for tracking (standardHeaders handles IPv6 automatically)
     keyGenerator: (req: Request) => {
       const authReq = req as AuthenticatedRequest;
       return authReq.user_id || 'anonymous';
     },
-    
+
     // Let express-rate-limit handle IP-based fallback with IPv6 support
     standardHeaders: true,
     legacyHeaders: false,
@@ -85,7 +85,7 @@ export const createRoleBasedRateLimiter = (
       const config = limits[userRole];
 
       const retryAfter = Math.ceil(config.windowMs / 1000);
-      
+
       const errorDetails = errorMessageService.getRateLimitMessage({
         limit: config.max,
         windowMs: config.windowMs,
@@ -97,21 +97,15 @@ export const createRoleBasedRateLimiter = (
       );
 
       res.set('Retry-After', String(retryAfter));
-      
-      sendError(
-        res,
-        errorDetails.message,
-        429,
-        'RATE_LIMIT_EXCEEDED',
-        {
-          limit: config.max,
-          windowMs: config.windowMs,
-          retryAfter: errorDetails.retryAfter,
-          retryAt: errorDetails.retryAt,
-          suggestion: errorDetails.suggestion,
-          userRole,
-        }
-      );
+
+      sendError(res, errorDetails.message, 429, 'RATE_LIMIT_EXCEEDED', {
+        limit: config.max,
+        windowMs: config.windowMs,
+        retryAfter: errorDetails.retryAfter,
+        retryAt: errorDetails.retryAt,
+        suggestion: errorDetails.suggestion,
+        userRole,
+      });
     },
 
     // Custom store per role (in-memory for now)
@@ -180,7 +174,7 @@ export const lenientRateLimiter = createRoleBasedRateLimiter({
 export const exportRateLimiter = createRoleBasedRateLimiter({
   [UserRole.User]: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5,                    // 5 exports per hour
+    max: 5, // 5 exports per hour
   },
   [UserRole.Moderator]: {
     windowMs: 60 * 60 * 1000,

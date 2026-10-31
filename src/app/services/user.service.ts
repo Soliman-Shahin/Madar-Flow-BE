@@ -236,7 +236,12 @@ export class UserService {
                           },
                           token: hashToken(nextToken),
                           expiresAt: now + REFRESH_TOKEN_EXPIRY_DAYS * 86400,
-                          createdAt: { $ifNull: ['$$session.createdAt', new Date(now * 1000)] },
+                          createdAt: {
+                            $ifNull: [
+                              '$$session.createdAt',
+                              new Date(now * 1000),
+                            ],
+                          },
                           lastAuthenticatedAt: new Date(now * 1000),
                           platform: { $ifNull: ['$$session.platform', 'web'] },
                         },

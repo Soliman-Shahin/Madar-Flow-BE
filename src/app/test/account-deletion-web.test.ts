@@ -40,7 +40,9 @@ describe('Public web account deletion', () => {
     expect(res.headers['content-type']).toMatch(/text\/html/);
     expect(res.headers['cache-control']).toBe('no-store');
     expect(res.headers['referrer-policy']).toBe('no-referrer');
-    expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(res.headers['content-security-policy']).toContain(
+      "default-src 'none'"
+    );
     expect(res.text).toContain('action="/account/delete"');
   });
 
@@ -73,12 +75,16 @@ describe('Public web account deletion', () => {
     const token = sentTokens[0];
     expect(token).toMatch(/^[a-f0-9]{64}$/);
 
-    const stored = await User.findById(user._id).select('+accountDeletionTokenHash');
+    const stored = await User.findById(user._id).select(
+      '+accountDeletionTokenHash'
+    );
     expect(stored!.accountDeletionTokenHash).toBeDefined();
     expect(stored!.accountDeletionTokenHash).not.toBe(token);
 
     // GET only renders a confirmation form; it never deletes.
-    const page = await request(app).get(`/account/delete/confirm?token=${token}`);
+    const page = await request(app).get(
+      `/account/delete/confirm?token=${token}`
+    );
     expect(page.status).toBe(200);
     expect(page.text).toContain(`value="${token}"`);
     expect(await User.exists({ _id: user._id })).toBeTruthy();

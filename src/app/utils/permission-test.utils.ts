@@ -5,7 +5,7 @@ import { PlanSlug } from '../types/plan.types';
 
 /**
  * Permission Testing Utilities
- * 
+ *
  * Helper functions for testing permission-related functionality.
  * Useful for unit tests, integration tests, and debugging.
  */
@@ -82,11 +82,12 @@ function getRoleDefaultPermissions(role: UserRole): Permission[] {
     Permission.CATEGORY_DELETE,
   ];
 
-  if (role === UserRole.Moderator || role === UserRole.Admin || role === UserRole.SuperAdmin) {
-    basePermissions.push(
-      Permission.ADMIN_DASHBOARD,
-      Permission.ADMIN_HEALTH
-    );
+  if (
+    role === UserRole.Moderator ||
+    role === UserRole.Admin ||
+    role === UserRole.SuperAdmin
+  ) {
+    basePermissions.push(Permission.ADMIN_DASHBOARD, Permission.ADMIN_HEALTH);
   }
 
   if (role === UserRole.Admin || role === UserRole.SuperAdmin) {
@@ -326,7 +327,8 @@ export function generatePermissionTestCases(): Array<{
       permissions.forEach((permission) => {
         const rolePerms = PermissionMatrix.roles[role];
         const planPerms = PermissionMatrix.plans[plan];
-        const expected = rolePerms.includes(permission) || planPerms.includes(permission);
+        const expected =
+          rolePerms.includes(permission) || planPerms.includes(permission);
 
         testCases.push({ role, plan, permission, expected });
       });

@@ -52,10 +52,18 @@ describe('security.new_login session boundary', () => {
     const canonicalId = new Types.ObjectId();
     const httpServer: HttpServer = createServer();
     const socketService = initializeSocketService(httpServer);
-    const realtime = jest.spyOn(socketService, 'sendNotificationToUser').mockImplementation(() => undefined);
-    const inbox = jest.spyOn(UserNotification, 'updateOne').mockResolvedValue({} as any);
-    const push = jest.spyOn(PushDeliveryService, 'sendToUsers').mockResolvedValue({} as any);
-    const create = jest.spyOn(Notification, 'create').mockResolvedValue({ _id: canonicalId } as any);
+    const realtime = jest
+      .spyOn(socketService, 'sendNotificationToUser')
+      .mockImplementation(() => undefined);
+    const inbox = jest
+      .spyOn(UserNotification, 'updateOne')
+      .mockResolvedValue({} as any);
+    const push = jest
+      .spyOn(PushDeliveryService, 'sendToUsers')
+      .mockResolvedValue({} as any);
+    const create = jest
+      .spyOn(Notification, 'create')
+      .mockResolvedValue({ _id: canonicalId } as any);
 
     try {
       const result = await NotificationService.dispatchUserEvent({
@@ -64,7 +72,10 @@ describe('security.new_login session boundary', () => {
         dedupeKey: 'security.new_login:canonical-fanout',
         title: 'New login',
         message: 'A new authenticated session was created.',
-        metadata: { authenticationMethod: 'password', occurredAt: new Date().toISOString() },
+        metadata: {
+          authenticationMethod: 'password',
+          occurredAt: new Date().toISOString(),
+        },
       });
 
       expect(result.created).toBe(true);
@@ -77,7 +88,9 @@ describe('security.new_login session boundary', () => {
       expect(realtime).toHaveBeenCalledTimes(1);
       expect(realtime.mock.calls[0][0]).toBe(user._id.toString());
       expect(realtime.mock.calls[0][1].id).toBe(canonicalId.toString());
-      expect((realtime.mock.calls[0][1] as any).event).toBe('security.new_login');
+      expect((realtime.mock.calls[0][1] as any).event).toBe(
+        'security.new_login'
+      );
       expect(push).toHaveBeenCalledTimes(1);
       expect(push.mock.calls[0][0].notificationId).toBe(canonicalId.toString());
     } finally {
@@ -185,19 +198,31 @@ describe('security.new_login session boundary', () => {
     const user = await account('logout-relogin-alert@example.test');
     const first = await request(app)
       .post('/v1/user/login')
-      .send({ data: encryptCryptoJS({ email: user.email, password: 'Testing-Password-42!' }) });
+      .send({
+        data: encryptCryptoJS({
+          email: user.email,
+          password: 'Testing-Password-42!',
+        }),
+      });
     expect(first.status).toBe(200);
     dispatch.mockClear();
 
     const logout = await request(app)
       .post('/v1/user/logout')
-      .send({ data: encryptCryptoJS({ refreshToken: first.body.data.refreshToken }) });
+      .send({
+        data: encryptCryptoJS({ refreshToken: first.body.data.refreshToken }),
+      });
     expect(logout.status).toBe(200);
     expect(dispatch).not.toHaveBeenCalled();
 
     const second = await request(app)
       .post('/v1/user/login')
-      .send({ data: encryptCryptoJS({ email: user.email, password: 'Testing-Password-42!' }) });
+      .send({
+        data: encryptCryptoJS({
+          email: user.email,
+          password: 'Testing-Password-42!',
+        }),
+      });
     expect(second.status).toBe(200);
     expect(dispatch).toHaveBeenCalledTimes(1);
   });
@@ -254,13 +279,17 @@ describe('security.new_login session boundary', () => {
         occurredAt: new Date().toISOString(),
       },
     };
-    jest.spyOn(NotificationService, 'resolveChannelsForUser').mockResolvedValue([]);
+    jest
+      .spyOn(NotificationService, 'resolveChannelsForUser')
+      .mockResolvedValue([]);
     let createCalls = 0;
-    const create = jest.spyOn(Notification, 'create').mockImplementation(async () => {
-      createCalls += 1;
-      if (createCalls === 2) throw { code: 11000 };
-      return { _id: 'notification-1' } as any;
-    });
+    const create = jest
+      .spyOn(Notification, 'create')
+      .mockImplementation(async () => {
+        createCalls += 1;
+        if (createCalls === 2) throw { code: 11000 };
+        return { _id: 'notification-1' } as any;
+      });
 
     const first = await NotificationService.dispatchUserEvent(input);
     const second = await NotificationService.dispatchUserEvent(input);
@@ -287,7 +316,9 @@ describe('security.new_login session boundary', () => {
     ]);
 
     expect(new Set(results.map((result) => result.refreshToken)).size).toBe(2);
-    expect(new Set(dispatch.mock.calls.map(([input]) => input.dedupeKey)).size).toBe(2);
+    expect(
+      new Set(dispatch.mock.calls.map(([input]) => input.dedupeKey)).size
+    ).toBe(2);
     expect((await User.findById(user._id))!.sessions).toHaveLength(2);
   });
 });

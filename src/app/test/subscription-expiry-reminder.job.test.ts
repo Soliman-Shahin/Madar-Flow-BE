@@ -67,7 +67,14 @@ describe('subscription expiry reminder job', () => {
     let resolveFirst!: () => void;
     processExpiringSubscriptions.mockReturnValueOnce(
       new Promise((resolve) => {
-        resolveFirst = () => resolve({ scanned: 0, eligible: 0, created: 0, skipped: 0, failures: 0 });
+        resolveFirst = () =>
+          resolve({
+            scanned: 0,
+            eligible: 0,
+            created: 0,
+            skipped: 0,
+            failures: 0,
+          });
       })
     );
 
@@ -84,7 +91,13 @@ describe('subscription expiry reminder job', () => {
   it('resets the guard after failure and allows a later execution', async () => {
     processExpiringSubscriptions
       .mockRejectedValueOnce(new Error('processor unavailable'))
-      .mockResolvedValueOnce({ scanned: 0, eligible: 0, created: 0, skipped: 0, failures: 0 });
+      .mockResolvedValueOnce({
+        scanned: 0,
+        eligible: 0,
+        created: 0,
+        skipped: 0,
+        failures: 0,
+      });
 
     await job.execute();
     await job.execute();
@@ -93,7 +106,9 @@ describe('subscription expiry reminder job', () => {
   });
 
   it('contains scheduled execution failures and keeps the scheduler alive', async () => {
-    processExpiringSubscriptions.mockRejectedValueOnce(new Error('temporary failure'));
+    processExpiringSubscriptions.mockRejectedValueOnce(
+      new Error('temporary failure')
+    );
     job.start();
     callback!();
     await new Promise((resolve) => setImmediate(resolve));

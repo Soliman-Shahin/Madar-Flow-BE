@@ -54,7 +54,11 @@ export class TelemetryController {
     }
   }
 
-  async summary(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async summary(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const parsed = telemetrySummaryQuerySchema.safeParse(req.query);
       if (!parsed.success) fail(parsed.error);

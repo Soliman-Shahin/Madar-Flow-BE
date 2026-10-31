@@ -16,16 +16,26 @@ describe('session cleanup job', () => {
       email: 'cleanup@example.test',
       password: 'not-used',
       sessions: [
-        { sessionId: 'old', token: 't1', expiresAt: secs(new Date(now.getTime() - DAY)) },
+        {
+          sessionId: 'old',
+          token: 't1',
+          expiresAt: secs(new Date(now.getTime() - DAY)),
+        },
         { sessionId: 'edge', token: 't2', expiresAt: secs(now) },
-        { sessionId: 'live', token: 't3', expiresAt: secs(new Date(now.getTime() + DAY)) },
+        {
+          sessionId: 'live',
+          token: 't3',
+          expiresAt: secs(new Date(now.getTime() + DAY)),
+        },
       ],
     } as any);
     const job = new SessionCleanupJob();
     const first = await job.execute(now);
     expect(first.modifiedUsers).toBe(1);
     const after = await User.findById(user._id).lean();
-    expect((after!.sessions as any[]).map((s) => s.sessionId)).toEqual(['live']);
+    expect((after!.sessions as any[]).map((s) => s.sessionId)).toEqual([
+      'live',
+    ]);
     expect((await job.execute(now)).modifiedUsers).toBe(0);
   });
 
@@ -41,17 +51,38 @@ describe('session cleanup job', () => {
 });
 
 describe('notification archival job', () => {
-  async function make(ageDays: number, archived: boolean, notificationId?: any) {
-    const user = await User.create({ email: `n-${Math.random()}@example.test`, password: 'not-used' });
+  async function make(
+    ageDays: number,
+    archived: boolean,
+    notificationId?: any
+  ) {
+    const user = await User.create({
+      email: `n-${Math.random()}@example.test`,
+      password: 'not-used',
+    });
     const notification =
       notificationId ??
-      (await Notification.create({ title: 't', message: 'm', createdBy: user._id }))._id;
+      (
+        await Notification.create({
+          title: 't',
+          message: 'm',
+          createdBy: user._id,
+        })
+      )._id;
     const createdAt = new Date(now.getTime() - ageDays * DAY);
     const row = await UserNotification.create({
-      notificationId: notification, userId: user._id, ...(archived ? { archivedAt: createdAt } : {}),
+      notificationId: notification,
+      userId: user._id,
+      ...(archived ? { archivedAt: createdAt } : {}),
     });
-    await UserNotification.collection.updateOne({ _id: row._id }, { $set: { createdAt } });
-    await Notification.collection.updateOne({ _id: notification }, { $set: { createdAt } });
+    await UserNotification.collection.updateOne(
+      { _id: row._id },
+      { $set: { createdAt } }
+    );
+    await Notification.collection.updateOne(
+      { _id: notification },
+      { $set: { createdAt } }
+    );
     return { row, notification };
   }
 
@@ -62,8 +93,12 @@ describe('notification archival job', () => {
     const job = new NotificationArchivalJob();
     const deleted = await job.execute(now);
 
-    expect((await UserNotification.findById(fresh.row._id))?.archivedAt).toBeUndefined();
-    expect((await UserNotification.findById(aging.row._id))?.archivedAt).toBeTruthy();
+    expect(
+      (await UserNotification.findById(fresh.row._id))?.archivedAt
+    ).toBeUndefined();
+    expect(
+      (await UserNotification.findById(aging.row._id))?.archivedAt
+    ).toBeTruthy();
     // 200-day-old row is archived in the same run and then removed by retention.
     expect(await UserNotification.findById(ancient.row._id)).toBeNull();
     expect(await Notification.findById(ancient.notification)).toBeNull();
@@ -73,9 +108,18 @@ describe('notification archival job', () => {
 
   it('keeps a shared notification while another recipient still references it', async () => {
     const old = await make(200, true);
-    const other = await User.create({ email: 'other-recipient@example.test', password: 'not-used' });
-    const keep = await UserNotification.create({ notificationId: old.notification, userId: other._id });
-    await UserNotification.collection.updateOne({ _id: keep._id }, { $set: { createdAt: new Date(now.getTime() - DAY) } });
+    const other = await User.create({
+      email: 'other-recipient@example.test',
+      password: 'not-used',
+    });
+    const keep = await UserNotification.create({
+      notificationId: old.notification,
+      userId: other._id,
+    });
+    await UserNotification.collection.updateOne(
+      { _id: keep._id },
+      { $set: { createdAt: new Date(now.getTime() - DAY) } }
+    );
     await new NotificationArchivalJob().execute(now);
     expect(await UserNotification.findById(old.row._id)).toBeNull();
     expect(await Notification.findById(old.notification)).not.toBeNull();
@@ -85,7 +129,9 @@ describe('notification archival job', () => {
 
 describe('analytics report schedule job', () => {
   it('returns the number of due reports processed', async () => {
-    const job = new AnalyticsReportScheduleJob({ runDue: jest.fn().mockResolvedValue(3) } as any);
+    const job = new AnalyticsReportScheduleJob({
+      runDue: jest.fn().mockResolvedValue(3),
+    } as any);
     expect(await job.execute(now)).toBe(3);
   });
 
@@ -102,11 +148,17 @@ describe('analytics report schedule job', () => {
   });
 
   it('resets the overlap guard after a failure and records it in the job registry', async () => {
-    const runDue = jest.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(1);
+    const runDue = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(1);
     const job = new AnalyticsReportScheduleJob({ runDue } as any);
     await jobRuns.track('analyticsReportSchedule', () => job.execute(now));
     expect(await job.execute(now)).toBe(1);
-    const entry: any = (jobRuns as any).snapshot?.().find?.((j: any) => j.name === 'analyticsReportSchedule');
-    if (entry) expect(entry.failures ?? entry.failureCount).toBeGreaterThanOrEqual(1);
+    const entry: any = (jobRuns as any)
+      .snapshot?.()
+      .find?.((j: any) => j.name === 'analyticsReportSchedule');
+    if (entry)
+      expect(entry.failures ?? entry.failureCount).toBeGreaterThanOrEqual(1);
   });
 });

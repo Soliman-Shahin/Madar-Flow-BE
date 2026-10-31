@@ -11,7 +11,7 @@ import { AuditAction } from '../models/audit-log.model';
 
 /**
  * Resource Ownership Middleware
- * 
+ *
  * Ensures users can only access/modify their own resources.
  * Admins can bypass ownership checks.
  */
@@ -22,10 +22,16 @@ export type ResourceType = 'expense' | 'category';
  * Check if user owns the resource or has admin privileges
  */
 export const requireOwnership = (resourceType: ResourceType) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const authReq = req as AuthenticatedRequest;
-      const resourceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const resourceId = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
       const userId = authReq.user_id;
       const userRole = authReq.user?.role;
 
@@ -36,7 +42,12 @@ export const requireOwnership = (resourceType: ResourceType) => {
 
       if (!resourceId) {
         logger.warn('requireOwnership: no resource id in params');
-        return sendError(res, 'Resource ID is required', 400, 'VALIDATION_ERROR');
+        return sendError(
+          res,
+          'Resource ID is required',
+          400,
+          'VALIDATION_ERROR'
+        );
       }
 
       // Admins bypass ownership check
@@ -54,7 +65,7 @@ export const requireOwnership = (resourceType: ResourceType) => {
         logger.warn(
           `Resource not found: ${resourceType}/${resourceId} by user ${userId}`
         );
-        
+
         // Log access denial
         await auditLogService.logAccessDenied({
           actorId: userId,
@@ -96,18 +107,12 @@ export const requireOwnership = (resourceType: ResourceType) => {
           reason: 'You do not own this resource',
         });
 
-        return sendError(
-          res,
-          errorDetails.message,
-          403,
-          'RESOURCE_NOT_OWNED',
-          {
-            resourceType,
-            resourceId,
-            suggestion: errorDetails.suggestion,
-            helpUrl: errorDetails.helpUrl,
-          }
-        );
+        return sendError(res, errorDetails.message, 403, 'RESOURCE_NOT_OWNED', {
+          resourceType,
+          resourceId,
+          suggestion: errorDetails.suggestion,
+          helpUrl: errorDetails.helpUrl,
+        });
       }
 
       logger.debug(
@@ -135,10 +140,16 @@ export const requireOwnership = (resourceType: ResourceType) => {
  * More lenient than requireOwnership - allows shared resources in the future
  */
 export const canAccessResource = (resourceType: ResourceType) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const authReq = req as AuthenticatedRequest;
-      const resourceId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const resourceId = Array.isArray(req.params.id)
+        ? req.params.id[0]
+        : req.params.id;
       const userId = authReq.user_id;
       const userRole = authReq.user?.role;
 
@@ -147,7 +158,12 @@ export const canAccessResource = (resourceType: ResourceType) => {
       }
 
       if (!resourceId) {
-        return sendError(res, 'Resource ID is required', 400, 'VALIDATION_ERROR');
+        return sendError(
+          res,
+          'Resource ID is required',
+          400,
+          'VALIDATION_ERROR'
+        );
       }
 
       // Admins can access any resource
@@ -176,7 +192,7 @@ export const canAccessResource = (resourceType: ResourceType) => {
       }
 
       const ownerId = resource.user?.toString();
-      
+
       // For now, only owner can access
       // In the future, this can be extended to check shared resources
       if (ownerId !== userId) {
@@ -216,7 +232,11 @@ export const canAccessResource = (resourceType: ResourceType) => {
  * Used in batch operations (e.g., delete multiple expenses)
  */
 export const requireBulkOwnership = (resourceType: ResourceType) => {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> => {
     try {
       const authReq = req as AuthenticatedRequest;
       const userId = authReq.user_id;

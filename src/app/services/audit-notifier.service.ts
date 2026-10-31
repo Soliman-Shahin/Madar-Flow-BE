@@ -29,7 +29,9 @@ export interface AuditNotifyParams {
  * connected socket, see D-032), and a failure in either step must never fail the business
  * operation that triggered it.
  */
-export async function auditAndNotifyStaff(params: AuditNotifyParams): Promise<void> {
+export async function auditAndNotifyStaff(
+  params: AuditNotifyParams
+): Promise<void> {
   let auditLogId: string | undefined;
 
   try {
@@ -46,7 +48,10 @@ export async function auditAndNotifyStaff(params: AuditNotifyParams): Promise<vo
     });
     auditLogId = auditLog._id.toString();
   } catch (err) {
-    logger.error('Failed to log audit event in auditAndNotifyStaff', err as Error);
+    logger.error(
+      'Failed to log audit event in auditAndNotifyStaff',
+      err as Error
+    );
   }
 
   try {
@@ -55,7 +60,11 @@ export async function auditAndNotifyStaff(params: AuditNotifyParams): Promise<vo
       message: params.notification.message,
       type: params.notification.type,
       action: params.action,
-      actor: { id: params.actorId, email: params.actorEmail, role: params.actorRole },
+      actor: {
+        id: params.actorId,
+        email: params.actorEmail,
+        role: params.actorRole,
+      },
       resource: {
         type: params.targetResourceType,
         id: params.targetResourceId,
@@ -65,6 +74,9 @@ export async function auditAndNotifyStaff(params: AuditNotifyParams): Promise<vo
       auditLogId,
     });
   } catch (err) {
-    logger.error('Failed to broadcast socket notification in auditAndNotifyStaff', err as Error);
+    logger.error(
+      'Failed to broadcast socket notification in auditAndNotifyStaff',
+      err as Error
+    );
   }
 }

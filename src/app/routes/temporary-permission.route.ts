@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { temporaryPermissionController } from '../controllers/temporary-permission.controller';
 import { verifyAccessToken } from '../middleware/access.middleware';
-import { requireAdmin, requireSuperAdmin } from '../middleware/admin.middleware';
+import {
+  requireAdmin,
+  requireSuperAdmin,
+} from '../middleware/admin.middleware';
 
 const router = Router();
 
@@ -15,7 +18,9 @@ router.use(verifyAccessToken);
  */
 router.get(
   '/me',
-  temporaryPermissionController.getMyPermissions.bind(temporaryPermissionController)
+  temporaryPermissionController.getMyPermissions.bind(
+    temporaryPermissionController
+  )
 );
 
 // ==================== ADMIN ROUTES ====================
@@ -27,7 +32,9 @@ router.get(
 router.post(
   '/',
   requireAdmin,
-  temporaryPermissionController.grantPermission.bind(temporaryPermissionController)
+  temporaryPermissionController.grantPermission.bind(
+    temporaryPermissionController
+  )
 );
 
 /**
@@ -37,7 +44,9 @@ router.post(
 router.delete(
   '/:id',
   requireAdmin,
-  temporaryPermissionController.revokePermission.bind(temporaryPermissionController)
+  temporaryPermissionController.revokePermission.bind(
+    temporaryPermissionController
+  )
 );
 
 /**
@@ -47,7 +56,9 @@ router.delete(
 router.patch(
   '/:id/extend',
   requireAdmin,
-  temporaryPermissionController.extendPermission.bind(temporaryPermissionController)
+  temporaryPermissionController.extendPermission.bind(
+    temporaryPermissionController
+  )
 );
 
 /**
@@ -56,7 +67,9 @@ router.patch(
 router.get(
   '/user/:userId',
   requireAdmin,
-  temporaryPermissionController.getUserPermissions.bind(temporaryPermissionController)
+  temporaryPermissionController.getUserPermissions.bind(
+    temporaryPermissionController
+  )
 );
 
 /**
@@ -66,7 +79,9 @@ router.get(
 router.get(
   '/expiring-soon',
   requireAdmin,
-  temporaryPermissionController.getExpiringSoon.bind(temporaryPermissionController)
+  temporaryPermissionController.getExpiringSoon.bind(
+    temporaryPermissionController
+  )
 );
 
 /**
@@ -75,7 +90,9 @@ router.get(
 router.get(
   '/stats',
   requireAdmin,
-  temporaryPermissionController.getStatistics.bind(temporaryPermissionController)
+  temporaryPermissionController.getStatistics.bind(
+    temporaryPermissionController
+  )
 );
 
 // ==================== SUPERADMIN ROUTES ====================
@@ -86,7 +103,9 @@ router.get(
 router.post(
   '/process-expired',
   requireSuperAdmin,
-  temporaryPermissionController.processExpired.bind(temporaryPermissionController)
+  temporaryPermissionController.processExpired.bind(
+    temporaryPermissionController
+  )
 );
 
 export default router;

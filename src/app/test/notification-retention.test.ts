@@ -31,7 +31,11 @@ describe('notification archival lifecycle', () => {
     createdAt: Date,
     extra: Record<string, unknown> = {}
   ) {
-    const row = await UserNotification.create({ notificationId, userId: ownerId, ...extra });
+    const row = await UserNotification.create({
+      notificationId,
+      userId: ownerId,
+      ...extra,
+    });
     await UserNotification.collection.updateOne(
       { _id: row._id },
       { $set: { createdAt, updatedAt: createdAt } }
@@ -83,7 +87,10 @@ describe('notification archival lifecycle', () => {
     const newer = await createNotification(days(89));
     const older = await createNotification(days(120));
     const readAt = new Date('2025-12-01T00:00:00.000Z');
-    await createAssociation(exact._id, userId, days(90), { readAt, openedAt: readAt });
+    await createAssociation(exact._id, userId, days(90), {
+      readAt,
+      openedAt: readAt,
+    });
     await createAssociation(newer._id, userId, days(89));
     await createAssociation(older._id, userId, days(120));
 
@@ -199,42 +206,67 @@ describe('notification archival lifecycle', () => {
     const exact = await createNotification(days(180));
     const older = await createNotification(days(200));
     const younger = await createNotification(days(179));
-    await createAssociation(exact._id, userId, days(180), { archivedAt: days(100) });
-    await createAssociation(older._id, userId, days(200), { archivedAt: days(100) });
-    await createAssociation(younger._id, userId, days(179), { archivedAt: days(100) });
+    await createAssociation(exact._id, userId, days(180), {
+      archivedAt: days(100),
+    });
+    await createAssociation(older._id, userId, days(200), {
+      archivedAt: days(100),
+    });
+    await createAssociation(younger._id, userId, days(179), {
+      archivedAt: days(100),
+    });
 
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedUserNotifications).toBe(2);
     expect(result.deletedNotifications).toBe(2);
-    expect(await UserNotification.exists({ notificationId: younger._id })).not.toBeNull();
+    expect(
+      await UserNotification.exists({ notificationId: younger._id })
+    ).not.toBeNull();
     expect(await Notification.exists({ _id: younger._id })).not.toBeNull();
   });
 
   it('does not delete an old active association or its canonical notification', async () => {
     const notification = await createNotification(days(200));
     await createAssociation(notification._id, userId, days(200));
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedUserNotifications).toBe(0);
-    expect(await UserNotification.exists({ notificationId: notification._id })).not.toBeNull();
+    expect(
+      await UserNotification.exists({ notificationId: notification._id })
+    ).not.toBeNull();
     expect(await Notification.exists({ _id: notification._id })).not.toBeNull();
   });
 
   it('keeps a broadcast canonical while any active or younger archived association remains', async () => {
     const notification = await createNotification(days(200));
-    await createAssociation(notification._id, userId, days(190), { archivedAt: days(100) });
-    await createAssociation(notification._id, otherUserId, days(170), { archivedAt: days(10) });
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    await createAssociation(notification._id, userId, days(190), {
+      archivedAt: days(100),
+    });
+    await createAssociation(notification._id, otherUserId, days(170), {
+      archivedAt: days(10),
+    });
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedUserNotifications).toBe(1);
     expect(result.deletedNotifications).toBe(0);
     expect(await Notification.exists({ _id: notification._id })).not.toBeNull();
-    expect(await NotificationService.getForUser(otherUserId.toString(), notification._id.toString())).not.toBeNull();
+    expect(
+      await NotificationService.getForUser(
+        otherUserId.toString(),
+        notification._id.toString()
+      )
+    ).not.toBeNull();
   });
 
   it('keeps a canonical referenced by an active association', async () => {
     const notification = await createNotification(days(200));
-    await createAssociation(notification._id, userId, days(190), { archivedAt: days(100) });
+    await createAssociation(notification._id, userId, days(190), {
+      archivedAt: days(100),
+    });
     await createAssociation(notification._id, otherUserId, days(10));
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedUserNotifications).toBe(1);
     expect(result.deletedNotifications).toBe(0);
     expect(await Notification.exists({ _id: notification._id })).not.toBeNull();
@@ -245,7 +277,8 @@ describe('notification archival lifecycle', () => {
     const recentOrphan = await createNotification(days(10));
     const referenced = await createNotification(days(200));
     await createAssociation(referenced._id, userId, days(10));
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedNotifications).toBe(1);
     expect(await Notification.exists({ _id: oldOrphan._id })).toBeNull();
     expect(await Notification.exists({ _id: recentOrphan._id })).not.toBeNull();
@@ -256,7 +289,8 @@ describe('notification archival lifecycle', () => {
     const notification = await createNotification(days(200));
     await createAssociation(notification._id, userId, days(200));
     await NotificationArchivalService.archiveEligible(referenceTime);
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedUserNotifications).toBe(1);
     expect(result.deletedNotifications).toBe(1);
     expect(await Notification.exists({ _id: notification._id })).toBeNull();
@@ -274,9 +308,14 @@ describe('notification archival lifecycle', () => {
     }));
     await UserNotification.collection.insertMany(associations);
 
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedUserNotifications).toBe(1001);
-    expect(await UserNotification.countDocuments({ notificationId: notification._id })).toBe(0);
+    expect(
+      await UserNotification.countDocuments({
+        notificationId: notification._id,
+      })
+    ).toBe(0);
     expect(await Notification.exists({ _id: notification._id })).toBeNull();
   });
 
@@ -295,7 +334,9 @@ describe('notification archival lifecycle', () => {
       _id: new Types.ObjectId(),
     }));
     await Notification.collection.insertMany(candidates);
-    const protectedIds = candidates.filter((_, index) => index % 100 === 0).map((candidate) => candidate._id);
+    const protectedIds = candidates
+      .filter((_, index) => index % 100 === 0)
+      .map((candidate) => candidate._id);
     await UserNotification.collection.insertMany(
       protectedIds.map((notificationId) => ({
         notificationId,
@@ -305,9 +346,12 @@ describe('notification archival lifecycle', () => {
       }))
     );
 
-    const result = await NotificationRetentionService.deleteExpired(referenceTime);
+    const result =
+      await NotificationRetentionService.deleteExpired(referenceTime);
     expect(result.deletedNotifications).toBe(990);
-    expect(await Notification.countDocuments({ _id: { $in: protectedIds } })).toBe(11);
+    expect(
+      await Notification.countDocuments({ _id: { $in: protectedIds } })
+    ).toBe(11);
     expect(await Notification.countDocuments()).toBe(11);
   });
 });

@@ -27,7 +27,10 @@ import {
   usesHttpOnlyRefreshCookie,
 } from '../services/refresh-cookie.service';
 import { issueCsrfToken } from '../middleware/csrf.middleware';
-import { AuthenticatedRequest, verifyAccessToken } from '../middleware/access.middleware';
+import {
+  AuthenticatedRequest,
+  verifyAccessToken,
+} from '../middleware/access.middleware';
 import { validateRequestWithZod, verifySession } from '../middleware';
 import { loginSchema, signUpSchema } from '../validations/user.validation';
 import multer from 'multer';
@@ -206,41 +209,62 @@ router.post(
 router.post('/refresh-token', sessionRateLimiter, refreshToken);
 router.post('/logout', sessionRateLimiter, logout);
 router.get('/csrf-token', issueCsrfToken);
-router.get('/sessions', verifyAccessToken, async (req: Request, res: Response) => {
-  const auth = req as AuthenticatedRequest;
-  const user = await User.findById(auth.user_id).select('sessions').lean();
-  const now = Math.floor(Date.now() / 1000);
-  const sessions = (user?.sessions || [])
-    .filter((session: any) => session.expiresAt > now)
-    .map((session: any) => ({
-      id: session.sessionId,
-      platform: session.platform || 'web',
-      createdAt: session.createdAt || null,
-      lastAuthenticatedAt: session.lastAuthenticatedAt || session.createdAt || null,
-      expiresAt: session.expiresAt,
-      current: session.sessionId === auth.sessionId,
-    }));
-  return res.json({ success: true, data: { sessions } });
-});
-router.delete('/sessions/others', verifyAccessToken, async (req: Request, res: Response) => {
-  const auth = req as AuthenticatedRequest;
-  const result = await User.updateOne(
-    { _id: auth.user_id },
-    { $pull: { sessions: { sessionId: { $ne: auth.sessionId } } } }
-  );
-  return res.json({ success: true, data: { revoked: result.modifiedCount > 0 } });
-});
-router.delete('/sessions/:sessionId', verifyAccessToken, async (req: Request, res: Response) => {
-  const auth = req as AuthenticatedRequest;
-  if (!req.params.sessionId || req.params.sessionId === auth.sessionId) {
-    return res.status(400).json({ success: false, message: 'Current session must use logout' });
+router.get(
+  '/sessions',
+  verifyAccessToken,
+  async (req: Request, res: Response) => {
+    const auth = req as AuthenticatedRequest;
+    const user = await User.findById(auth.user_id).select('sessions').lean();
+    const now = Math.floor(Date.now() / 1000);
+    const sessions = (user?.sessions || [])
+      .filter((session: any) => session.expiresAt > now)
+      .map((session: any) => ({
+        id: session.sessionId,
+        platform: session.platform || 'web',
+        createdAt: session.createdAt || null,
+        lastAuthenticatedAt:
+          session.lastAuthenticatedAt || session.createdAt || null,
+        expiresAt: session.expiresAt,
+        current: session.sessionId === auth.sessionId,
+      }));
+    return res.json({ success: true, data: { sessions } });
   }
-  const result = await User.updateOne(
-    { _id: auth.user_id },
-    { $pull: { sessions: { sessionId: req.params.sessionId } } }
-  );
-  return res.json({ success: true, data: { revoked: result.modifiedCount > 0 } });
-});
+);
+router.delete(
+  '/sessions/others',
+  verifyAccessToken,
+  async (req: Request, res: Response) => {
+    const auth = req as AuthenticatedRequest;
+    const result = await User.updateOne(
+      { _id: auth.user_id },
+      { $pull: { sessions: { sessionId: { $ne: auth.sessionId } } } }
+    );
+    return res.json({
+      success: true,
+      data: { revoked: result.modifiedCount > 0 },
+    });
+  }
+);
+router.delete(
+  '/sessions/:sessionId',
+  verifyAccessToken,
+  async (req: Request, res: Response) => {
+    const auth = req as AuthenticatedRequest;
+    if (!req.params.sessionId || req.params.sessionId === auth.sessionId) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Current session must use logout' });
+    }
+    const result = await User.updateOne(
+      { _id: auth.user_id },
+      { $pull: { sessions: { sessionId: req.params.sessionId } } }
+    );
+    return res.json({
+      success: true,
+      data: { revoked: result.modifiedCount > 0 },
+    });
+  }
+);
 router.post(
   '/auth/google/exchange',
   strictAuthRateLimiter,

@@ -14,7 +14,9 @@ export class SubscriptionExpiryReminderJob {
 
   start(): void {
     if (this.task) {
-      logger.warn('[SubscriptionExpiryReminderJob] Scheduler is already running');
+      logger.warn(
+        '[SubscriptionExpiryReminderJob] Scheduler is already running'
+      );
       return;
     }
 
@@ -49,7 +51,9 @@ export class SubscriptionExpiryReminderJob {
 
   async execute(referenceTime: Date = new Date()): Promise<void> {
     if (this.executing) {
-      logger.debug('[SubscriptionExpiryReminderJob] Overlapping execution skipped');
+      logger.debug(
+        '[SubscriptionExpiryReminderJob] Overlapping execution skipped'
+      );
       return;
     }
 
@@ -74,4 +78,5 @@ export class SubscriptionExpiryReminderJob {
   }
 }
 
-export const subscriptionExpiryReminderJob = new SubscriptionExpiryReminderJob();
+export const subscriptionExpiryReminderJob =
+  new SubscriptionExpiryReminderJob();

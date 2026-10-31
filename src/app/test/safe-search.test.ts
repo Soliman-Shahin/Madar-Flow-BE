@@ -28,7 +28,11 @@ describe('safeSearchPattern', () => {
     await Expense.create([
       { ...base, _clientId: 'c1', description: 'a.b' },
       { ...base, _clientId: 'c2', description: 'axb' },
-      { ...base, _clientId: 'c3', description: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!' },
+      {
+        ...base,
+        _clientId: 'c3',
+        description: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!',
+      },
     ] as any);
 
     const literal = await Expense.find({

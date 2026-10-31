@@ -7,8 +7,29 @@ import { sendUserAndTokens } from '../shared/helper/send-user-and-token';
 import { auditLogService } from '../services/audit-log.service';
 import { AuditAction, AuditSeverity } from '../models/audit-log.model';
 const failure = 'Biometric authentication failed';
-const audit = async (req: AuthenticatedRequest, action: AuditAction, targetUserId?: string, success = true) => {
-  try { await auditLogService.log({ req, action, targetUserId, success, severity: success ? AuditSeverity.INFO : AuditSeverity.WARNING, metadata: { deviceId: typeof req.body?.deviceId === 'string' ? req.body.deviceId : undefined } }); } catch { /* audit failure must not expose credentials or break auth */ }
+const audit = async (
+  req: AuthenticatedRequest,
+  action: AuditAction,
+  targetUserId?: string,
+  success = true
+) => {
+  try {
+    await auditLogService.log({
+      req,
+      action,
+      targetUserId,
+      success,
+      severity: success ? AuditSeverity.INFO : AuditSeverity.WARNING,
+      metadata: {
+        deviceId:
+          typeof req.body?.deviceId === 'string'
+            ? req.body.deviceId
+            : undefined,
+      },
+    });
+  } catch {
+    /* audit failure must not expose credentials or break auth */
+  }
 };
 export const enrollBiometric = async (
   req: AuthenticatedRequest,
@@ -47,13 +68,19 @@ export const biometricSignIn = async (
       req.body.deviceId,
       req.body.credential
     );
-    if (!record) { await audit(req, AuditAction.BIOMETRIC_SIGNIN_FAILED, undefined, false); return sendError(res, failure, 401, 'BIOMETRIC_AUTH_FAILED'); }
+    if (!record) {
+      await audit(req, AuditAction.BIOMETRIC_SIGNIN_FAILED, undefined, false);
+      return sendError(res, failure, 401, 'BIOMETRIC_AUTH_FAILED');
+    }
     const user = await User.findOne({
       _id: record.userId,
       _isDeleted: { $ne: true },
       isActive: { $ne: false },
     });
-    if (!user) { await audit(req, AuditAction.BIOMETRIC_SIGNIN_FAILED, undefined, false); return sendError(res, failure, 401, 'BIOMETRIC_AUTH_FAILED'); }
+    if (!user) {
+      await audit(req, AuditAction.BIOMETRIC_SIGNIN_FAILED, undefined, false);
+      return sendError(res, failure, 401, 'BIOMETRIC_AUTH_FAILED');
+    }
     await audit(req, AuditAction.BIOMETRIC_SIGNIN, user._id.toString());
     return sendUserAndTokens(res, user);
   } catch {

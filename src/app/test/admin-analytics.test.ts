@@ -420,7 +420,9 @@ describe('Activation funnel', () => {
     const funnel = await service.funnel(7, now);
     const paying = funnel.stages.find((stage) => stage.key === 'paying');
 
-    expect(funnel.stages.find((stage) => stage.key === 'active')?.count).toBe(1);
+    expect(funnel.stages.find((stage) => stage.key === 'active')?.count).toBe(
+      1
+    );
     expect(paying?.count).toBe(0);
     expect(funnel.totals.subscribed).toBe(0);
   });

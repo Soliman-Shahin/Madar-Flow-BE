@@ -82,12 +82,17 @@ class RateLimiter {
       record.count++;
 
       // Optionally refund the slot once the outcome is known (e.g. only failed logins count).
-      if (this.config.skipSuccessfulRequests || this.config.skipFailedRequests) {
+      if (
+        this.config.skipSuccessfulRequests ||
+        this.config.skipFailedRequests
+      ) {
         res.on('finish', () => {
           const ok = res.statusCode < 400;
           const refund =
-            (ok && this.config.skipSuccessfulRequests) || (!ok && this.config.skipFailedRequests);
-          if (refund && this.store[key] === record && record.count > 0) record.count--;
+            (ok && this.config.skipSuccessfulRequests) ||
+            (!ok && this.config.skipFailedRequests);
+          if (refund && this.store[key] === record && record.count > 0)
+            record.count--;
         });
       }
 

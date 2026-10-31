@@ -10,7 +10,7 @@ jobRuns.register(JOB_NAME, DEFAULT_PERMISSION_EXPIRY_CRON);
 
 /**
  * Permission Expiry Job
- * 
+ *
  * Runs periodically to process expired temporary permissions.
  * Deactivates expired permissions and invalidates user caches.
  */
@@ -33,7 +33,9 @@ class PermissionExpiryJob {
     });
     jobRuns.markScheduled(JOB_NAME, true);
 
-    logger.info(`Permission expiry job started with schedule: ${cronExpression}`);
+    logger.info(
+      `Permission expiry job started with schedule: ${cronExpression}`
+    );
   }
 
   /**
@@ -55,12 +57,17 @@ class PermissionExpiryJob {
     try {
       logger.info('Running permission expiry job...');
 
-      const processedCount = await temporaryPermissionService.processExpiredPermissions();
+      const processedCount =
+        await temporaryPermissionService.processExpiredPermissions();
 
       if (processedCount > 0) {
-        logger.info(`Permission expiry job completed: ${processedCount} permissions processed`);
+        logger.info(
+          `Permission expiry job completed: ${processedCount} permissions processed`
+        );
       } else {
-        logger.debug('Permission expiry job completed: no expired permissions found');
+        logger.debug(
+          'Permission expiry job completed: no expired permissions found'
+        );
       }
     } catch (error: any) {
       jobRuns.fail(JOB_NAME, error);

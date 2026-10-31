@@ -1,12 +1,15 @@
 import { Permission, PERMISSION_GROUPS } from '../types/permissions.types';
-import { PermissionScope, SCOPE_PERMISSIONS } from '../types/permission-scopes.types';
+import {
+  PermissionScope,
+  SCOPE_PERMISSIONS,
+} from '../types/permission-scopes.types';
 import { PlanSlug } from '../types/plan.types';
 import { Plan } from '../models/plan.model';
 import { Role } from '../types/role.types';
 
 /**
  * Permission Export Service
- * 
+ *
  * Provides functionality to export permission matrices in various formats:
  * - JSON: Structured data for API consumption
  * - CSV: Spreadsheet-compatible format
@@ -74,34 +77,35 @@ class PermissionExportService {
       [Permission.CATEGORY_READ]: 'View and list categories',
       [Permission.CATEGORY_UPDATE]: 'Modify existing categories',
       [Permission.CATEGORY_DELETE]: 'Delete categories',
-      
+
       // Expenses
       [Permission.EXPENSE_CREATE]: 'Create new expenses/transactions',
       [Permission.EXPENSE_READ]: 'View and list expenses',
       [Permission.EXPENSE_UPDATE]: 'Modify existing expenses',
       [Permission.EXPENSE_DELETE]: 'Delete expenses',
       [Permission.EXPENSE_EXPORT]: 'Export expenses to CSV/PDF',
-      
+
       // Reports
       [Permission.REPORT_VIEW]: 'View basic financial reports',
       [Permission.REPORT_ADVANCED]: 'Access advanced analytics and insights',
-      
+
       // Backup & Sync
       [Permission.BACKUP_LOCAL]: 'Create local backups',
       [Permission.BACKUP_GDRIVE]: 'Sync with Google Drive',
       [Permission.SYNC_MULTI_DEVICE]: 'Sync data across multiple devices',
-      
+
       // Profile
       [Permission.PROFILE_UPDATE]: 'Update profile information',
       [Permission.PROFILE_AVATAR]: 'Upload and change avatar',
-      
+
       // Support
       [Permission.SUPPORT_PRIORITY]: 'Access priority customer support',
-      
+
       // Security
-      [Permission.SECURITY_ADVANCED_ENCRYPTION]: 'Use advanced end-to-end encryption',
+      [Permission.SECURITY_ADVANCED_ENCRYPTION]:
+        'Use advanced end-to-end encryption',
       [Permission.SECURITY_BIOMETRIC]: 'Enable biometric authentication',
-      
+
       // Admin
       [Permission.ADMIN_DASHBOARD]: 'Access admin dashboard',
       [Permission.ADMIN_USERS]: 'Manage users',
@@ -132,13 +136,13 @@ class PermissionExportService {
    */
   private getScopesForPermission(permission: Permission): PermissionScope[] {
     const scopes: PermissionScope[] = [];
-    
+
     for (const [scope, permissions] of Object.entries(SCOPE_PERMISSIONS)) {
       if (permissions.includes(permission)) {
         scopes.push(scope as PermissionScope);
       }
     }
-    
+
     return scopes;
   }
 
@@ -166,10 +170,7 @@ class PermissionExportService {
       },
       {
         role: Role.Moderator,
-        permissions: [
-          Permission.ADMIN_DASHBOARD,
-          Permission.ADMIN_HEALTH,
-        ],
+        permissions: [Permission.ADMIN_DASHBOARD, Permission.ADMIN_HEALTH],
       },
       {
         role: Role.Admin,
@@ -195,33 +196,35 @@ class PermissionExportService {
   async buildPermissionMatrix(): Promise<PermissionMatrix> {
     // Fetch all plans from database
     const plans = await Plan.find({ isActive: true }).sort({ order: 1 });
-    
+
     // Get role permissions
     const rolePermissions = this.getRolePermissions();
-    
+
     // Build permission entries
-    const permissions: PermissionMatrixEntry[] = Object.values(Permission).map((permission) => {
-      const entry: PermissionMatrixEntry = {
-        permission,
-        group: this.getPermissionGroup(permission),
-        description: this.getPermissionDescription(permission),
-        plans: {},
-        roles: {},
-        scopes: this.getScopesForPermission(permission),
-      };
+    const permissions: PermissionMatrixEntry[] = Object.values(Permission).map(
+      (permission) => {
+        const entry: PermissionMatrixEntry = {
+          permission,
+          group: this.getPermissionGroup(permission),
+          description: this.getPermissionDescription(permission),
+          plans: {},
+          roles: {},
+          scopes: this.getScopesForPermission(permission),
+        };
 
-      // Check which plans include this permission
-      plans.forEach((plan) => {
-        entry.plans[plan.slug] = plan.features.includes(permission);
-      });
+        // Check which plans include this permission
+        plans.forEach((plan) => {
+          entry.plans[plan.slug] = plan.features.includes(permission);
+        });
 
-      // Check which roles include this permission
-      rolePermissions.forEach(({ role, permissions: perms }) => {
-        entry.roles[role] = perms.includes(permission);
-      });
+        // Check which roles include this permission
+        rolePermissions.forEach(({ role, permissions: perms }) => {
+          entry.roles[role] = perms.includes(permission);
+        });
 
-      return entry;
-    });
+        return entry;
+      }
+    );
 
     return {
       permissions,
@@ -258,7 +261,7 @@ class PermissionExportService {
    */
   async exportAsCSV(): Promise<string> {
     const matrix = await this.buildPermissionMatrix();
-    
+
     // Build CSV header
     const planColumns = matrix.plans.map((p) => p.name);
     const roleColumns = Object.values(Role);
@@ -273,8 +276,12 @@ class PermissionExportService {
 
     // Build CSV rows
     const rows = matrix.permissions.map((entry) => {
-      const planValues = matrix.plans.map((p) => entry.plans[p.slug] ? 'Yes' : 'No');
-      const roleValues = Object.values(Role).map((r) => entry.roles[r] ? 'Yes' : 'No');
+      const planValues = matrix.plans.map((p) =>
+        entry.plans[p.slug] ? 'Yes' : 'No'
+      );
+      const roleValues = Object.values(Role).map((r) =>
+        entry.roles[r] ? 'Yes' : 'No'
+      );
       const scopes = entry.scopes.join('; ');
 
       return [
@@ -295,7 +302,7 @@ class PermissionExportService {
    */
   async exportAsMarkdown(): Promise<string> {
     const matrix = await this.buildPermissionMatrix();
-    
+
     let markdown = '# Permission Matrix\n\n';
     markdown += `Generated at: ${matrix.metadata.generatedAt.toISOString()}\n\n`;
     markdown += `**Statistics:**\n`;
@@ -316,7 +323,7 @@ class PermissionExportService {
     // Create table for each group
     Object.entries(groupedPermissions).forEach(([group, entries]) => {
       markdown += `## ${group.charAt(0).toUpperCase() + group.slice(1)}\n\n`;
-      
+
       // Table header
       const planColumns = matrix.plans.map((p) => p.name);
       markdown += `| Permission | Description | ${planColumns.join(' | ')} |\n`;
@@ -324,7 +331,9 @@ class PermissionExportService {
 
       // Table rows
       entries.forEach((entry) => {
-        const planValues = matrix.plans.map((p) => entry.plans[p.slug] ? '✅' : '❌');
+        const planValues = matrix.plans.map((p) =>
+          entry.plans[p.slug] ? '✅' : '❌'
+        );
         markdown += `| ${entry.permission} | ${entry.description} | ${planValues.join(' | ')} |\n`;
       });
 
@@ -337,7 +346,10 @@ class PermissionExportService {
   /**
    * Compare two plans
    */
-  async comparePlans(slug1: PlanSlug, slug2: PlanSlug): Promise<ComparisonResult> {
+  async comparePlans(
+    slug1: PlanSlug,
+    slug2: PlanSlug
+  ): Promise<ComparisonResult> {
     const plan1 = await Plan.findOne({ slug: slug1 });
     const plan2 = await Plan.findOne({ slug: slug2 });
 
@@ -352,7 +364,9 @@ class PermissionExportService {
     const onlyIn1 = permissions1.filter((p) => !permissions2.includes(p));
     const onlyIn2 = permissions2.filter((p) => !permissions1.includes(p));
 
-    const similarity = (common.length / Math.max(permissions1.length, permissions2.length)) * 100;
+    const similarity =
+      (common.length / Math.max(permissions1.length, permissions2.length)) *
+      100;
 
     return {
       entity1: plan1.name,
@@ -372,7 +386,7 @@ class PermissionExportService {
    */
   async compareRoles(role1: Role, role2: Role): Promise<ComparisonResult> {
     const rolePermissions = this.getRolePermissions();
-    
+
     const roleData1 = rolePermissions.find((r) => r.role === role1);
     const roleData2 = rolePermissions.find((r) => r.role === role2);
 
@@ -387,7 +401,9 @@ class PermissionExportService {
     const onlyIn1 = permissions1.filter((p) => !permissions2.includes(p));
     const onlyIn2 = permissions2.filter((p) => !permissions1.includes(p));
 
-    const similarity = (common.length / Math.max(permissions1.length, permissions2.length)) * 100;
+    const similarity =
+      (common.length / Math.max(permissions1.length, permissions2.length)) *
+      100;
 
     return {
       entity1: role1,
@@ -411,7 +427,8 @@ class PermissionExportService {
     // Permissions by group
     const permissionsByGroup: Record<string, number> = {};
     matrix.permissions.forEach((entry) => {
-      permissionsByGroup[entry.group] = (permissionsByGroup[entry.group] || 0) + 1;
+      permissionsByGroup[entry.group] =
+        (permissionsByGroup[entry.group] || 0) + 1;
     });
 
     // Permissions by plan
@@ -431,9 +448,11 @@ class PermissionExportService {
     // Coverage matrix (which plans cover which groups)
     const coverageMatrix = matrix.plans.map((plan) => {
       const coverage: Record<string, number> = {};
-      
+
       Object.entries(PERMISSION_GROUPS).forEach(([group, permissions]) => {
-        const coveredCount = permissions.filter((p) => plan.permissions.includes(p)).length;
+        const coveredCount = permissions.filter((p) =>
+          plan.permissions.includes(p)
+        ).length;
         coverage[group] = (coveredCount / permissions.length) * 100;
       });
 

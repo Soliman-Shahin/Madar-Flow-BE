@@ -7,7 +7,7 @@ import logger from '../services/logger.service';
 
 /**
  * Scope Controller
- * 
+ *
  * Handles HTTP requests for scope queries and management
  */
 class ScopeController {
@@ -32,7 +32,9 @@ class ScopeController {
   async getScopesByCategory(req: Request, res: Response): Promise<void> {
     try {
       const rawCategory = req.params.category;
-      const category = Array.isArray(rawCategory) ? rawCategory[0] : rawCategory;
+      const category = Array.isArray(rawCategory)
+        ? rawCategory[0]
+        : rawCategory;
 
       if (!['resource', 'admin', 'feature'].includes(category)) {
         return sendError(
@@ -68,12 +70,7 @@ class ScopeController {
       const scope = Array.isArray(rawScope) ? rawScope[0] : rawScope;
 
       if (!Object.values(PermissionScope).includes(scope as PermissionScope)) {
-        return sendError(
-          res,
-          'Invalid scope',
-          400,
-          'VALIDATION_ERROR'
-        );
+        return sendError(res, 'Invalid scope', 400, 'VALIDATION_ERROR');
       }
 
       const details = scopeService.getScopeDetails(scope as PermissionScope);
@@ -188,7 +185,12 @@ class ScopeController {
       );
     } catch (error: any) {
       logger.error('Error getting missing scopes:', error.message);
-      sendError(res, 'Failed to retrieve missing scopes', 500, 'INTERNAL_ERROR');
+      sendError(
+        res,
+        'Failed to retrieve missing scopes',
+        500,
+        'INTERNAL_ERROR'
+      );
     }
   }
 

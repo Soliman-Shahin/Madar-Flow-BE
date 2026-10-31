@@ -1,4 +1,7 @@
-import { isValidReportTimezone, nextAnalyticsReportRunAt } from '../services/analytics-report-schedule.service';
+import {
+  isValidReportTimezone,
+  nextAnalyticsReportRunAt,
+} from '../services/analytics-report-schedule.service';
 
 jest.mock('../models/analytics-report-schedule.model', () => ({
   AnalyticsReportSchedule: {},
@@ -12,7 +15,10 @@ jest.mock('../services/admin-analytics.service', () => ({
   adminAnalyticsService: {},
 }));
 jest.mock('../services/mail.service', () => ({ MailService: {} }));
-jest.mock('../services/logger.service', () => ({ __esModule: true, default: { error: jest.fn() } }));
+jest.mock('../services/logger.service', () => ({
+  __esModule: true,
+  default: { error: jest.fn() },
+}));
 
 describe('analytics report schedule recurrence', () => {
   it('resolves a weekly occurrence in the requested local timezone', () => {

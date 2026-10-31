@@ -133,7 +133,11 @@ export class AdminController {
     try {
       const authReq = req as AuthenticatedRequest;
       const actorRole = authReq.user?.role as UserRole;
-      const user = await adminService.deleteUser(actorRole, req.params.id as string, req);
+      const user = await adminService.deleteUser(
+        actorRole,
+        req.params.id as string,
+        req
+      );
       sendSuccess(res, user, 'User deleted successfully');
     } catch (error) {
       next(error);
@@ -152,7 +156,11 @@ export class AdminController {
     try {
       const authReq = req as AuthenticatedRequest;
       const actorRole = authReq.user?.role as UserRole;
-      const user = await adminService.restoreUser(actorRole, req.params.id as string, req);
+      const user = await adminService.restoreUser(
+        actorRole,
+        req.params.id as string,
+        req
+      );
       sendSuccess(res, user, 'User restored successfully');
     } catch (error) {
       next(error);
@@ -346,7 +354,10 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const expense = await adminService.deleteExpense(req.params.id as string, req);
+      const expense = await adminService.deleteExpense(
+        req.params.id as string,
+        req
+      );
       sendSuccess(res, expense, 'Expense deleted successfully');
     } catch (error) {
       next(error);
@@ -363,7 +374,10 @@ export class AdminController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const expense = await adminService.restoreExpense(req.params.id as string, req);
+      const expense = await adminService.restoreExpense(
+        req.params.id as string,
+        req
+      );
       sendSuccess(res, expense, 'Expense restored successfully');
     } catch (error) {
       next(error);

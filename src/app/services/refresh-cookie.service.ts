@@ -9,15 +9,20 @@ function refreshCookiePath(req: Request): string {
 }
 
 export function usesHttpOnlyRefreshCookie(req: Request): boolean {
-  return req.get('x-auth-transport') === 'cookie' ||
-    typeof req.cookies?.[REFRESH_COOKIE_NAME] === 'string';
+  return (
+    req.get('x-auth-transport') === 'cookie' ||
+    typeof req.cookies?.[REFRESH_COOKIE_NAME] === 'string'
+  );
 }
 
 function cookieOptions(req: Request) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
+    sameSite:
+      process.env.NODE_ENV === 'production'
+        ? ('none' as const)
+        : ('lax' as const),
     path: refreshCookiePath(req),
     ...(req.get('x-auth-persistence') === 'persistent'
       ? { maxAge: refreshCookieLifetimeMs() }
@@ -26,12 +31,19 @@ function cookieOptions(req: Request) {
 }
 
 function refreshCookieLifetimeMs(): number {
-  const configured = Number.parseInt(process.env.REFRESH_TOKEN_EXPIRY_DAYS || '10', 10);
+  const configured = Number.parseInt(
+    process.env.REFRESH_TOKEN_EXPIRY_DAYS || '10',
+    10
+  );
   const days = Number.isFinite(configured) && configured > 0 ? configured : 10;
   return days * 24 * 60 * 60 * 1000;
 }
 
-export function setRefreshCookie(req: Request, res: Response, token: string): void {
+export function setRefreshCookie(
+  req: Request,
+  res: Response,
+  token: string
+): void {
   res.cookie(REFRESH_COOKIE_NAME, token, cookieOptions(req));
 }
 

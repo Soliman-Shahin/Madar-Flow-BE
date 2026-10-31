@@ -2,7 +2,13 @@ import { validateEncryptionKey } from './encryption-config';
 
 describe('encryption key configuration', () => {
   it('rejects missing and clearly weak values without exposing them', () => {
-    for (const value of [undefined, '', 'short', 'x'.repeat(32), 'change-me-' + 'x'.repeat(24)]) {
+    for (const value of [
+      undefined,
+      '',
+      'short',
+      'x'.repeat(32),
+      'change-me-' + 'x'.repeat(24),
+    ]) {
       expect(() => validateEncryptionKey(value)).toThrow(/ENCRYPTION_KEY/);
       try {
         validateEncryptionKey(value);

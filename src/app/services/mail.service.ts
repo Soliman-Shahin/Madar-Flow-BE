@@ -9,7 +9,8 @@ export class MailService {
   ): Promise<void> {
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.RESEND_FROM_EMAIL;
-    if (!apiKey || !from) throw new Error('Analytics report mail is not configured');
+    if (!apiKey || !from)
+      throw new Error('Analytics report mail is not configured');
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {

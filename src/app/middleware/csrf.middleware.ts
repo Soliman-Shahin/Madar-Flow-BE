@@ -41,7 +41,8 @@ export const conditionalCsrfProtection = (
   const refreshPaths = ['/v1/user/refresh-token', '/v1/user/logout'];
   const usesRefreshCookie =
     typeof req.cookies?.mf_refresh === 'string' ||
-    (req.get('x-auth-transport') === 'cookie' && refreshPaths.includes(req.path));
+    (req.get('x-auth-transport') === 'cookie' &&
+      refreshPaths.includes(req.path));
   if (usesRefreshCookie && refreshPaths.includes(req.path)) {
     return runCsrfProtection(req, res, next);
   }
@@ -72,7 +73,10 @@ export const conditionalCsrfProtection = (
     '/api-docs',
   ];
 
-  if (!usesRefreshCookie && exemptPaths.some((path) => req.path.includes(path))) {
+  if (
+    !usesRefreshCookie &&
+    exemptPaths.some((path) => req.path.includes(path))
+  ) {
     return next();
   }
 
@@ -95,7 +99,11 @@ export const getCsrfToken = (req: Request, res: Response) => {
   });
 };
 
-export const issueCsrfToken = (req: Request, res: Response, next: NextFunction) =>
+export const issueCsrfToken = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) =>
   runCsrfProtection(req, res, (error?: unknown) => {
     if (error) return next(error);
     return res.json({ csrfToken: (req as any).csrfToken() });

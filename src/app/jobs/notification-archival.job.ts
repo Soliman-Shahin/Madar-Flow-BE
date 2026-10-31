@@ -35,7 +35,8 @@ export class NotificationArchivalJob {
     this.executing = true;
     try {
       await NotificationArchivalService.archiveEligible(referenceTime);
-      const result = await NotificationRetentionService.deleteExpired(referenceTime);
+      const result =
+        await NotificationRetentionService.deleteExpired(referenceTime);
       return result.deletedUserNotifications;
     } catch (error: any) {
       jobRuns.fail(JOB_NAME, error);

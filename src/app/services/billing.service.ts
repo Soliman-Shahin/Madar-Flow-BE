@@ -162,7 +162,9 @@ export class BillingService {
     const active = await Subscription.findOne({
       user: userId,
       status:
-        event.type === 'cancelled' ? 'active' : { $in: ['active', 'cancelled'] },
+        event.type === 'cancelled'
+          ? 'active'
+          : { $in: ['active', 'cancelled'] },
       paymentMethod: event.provider,
     }).sort({ startDate: -1 });
     if (!active) return { applied: false, reason: 'not_managed' };

@@ -51,12 +51,7 @@ describe('notification preference foundation', () => {
     for (const response of responses) {
       expect(Object.keys(response)).toHaveLength(4);
       expect(Object.keys(response)).toEqual(
-        expect.arrayContaining([
-        'sync',
-        'subscription',
-        'security',
-        'general',
-        ])
+        expect.arrayContaining(['sync', 'subscription', 'security', 'general'])
       );
     }
     const result = await NotificationPreferenceService.getForUser(userId);
@@ -66,7 +61,11 @@ describe('notification preference foundation', () => {
     expect(result.sync.realtime).toBe(true);
     expect(result.subscription.inbox).toBe(true);
     expect(result.subscription.realtime).toBe(true);
-    expect(result.security).toEqual({ inbox: true, realtime: true, push: true });
+    expect(result.security).toEqual({
+      inbox: true,
+      realtime: true,
+      push: true,
+    });
     expect(result.general).toEqual({ inbox: true, realtime: true, push: true });
     expect(await NotificationPreference.countDocuments({ userId })).toBe(1);
   });
@@ -168,9 +167,7 @@ describe('notification preference foundation', () => {
       security: { inbox: true, realtime: true, push: true },
       general: { inbox: true, realtime: true, push: true },
     });
-    expect(
-      await NotificationPreference.countDocuments({ userId })
-    ).toBe(1);
+    expect(await NotificationPreference.countDocuments({ userId })).toBe(1);
   });
 
   it('is idempotent and keeps one preference document per user', async () => {
@@ -180,7 +177,9 @@ describe('notification preference foundation', () => {
     await NotificationPreferenceService.updateForUser(userId, patch);
     await NotificationPreferenceService.updateForUser(userId, patch);
 
-    expect((await NotificationPreferenceService.getForUser(userId)).subscription.push).toBe(false);
+    expect(
+      (await NotificationPreferenceService.getForUser(userId)).subscription.push
+    ).toBe(false);
     expect(await NotificationPreference.countDocuments({ userId })).toBe(1);
   });
 
@@ -192,8 +191,12 @@ describe('notification preference foundation', () => {
       sync: { push: false },
     });
 
-    expect((await NotificationPreferenceService.getForUser(userB)).sync.push).toBe(true);
-    expect((await NotificationPreferenceService.getForUser(userA)).sync.push).toBe(false);
+    expect(
+      (await NotificationPreferenceService.getForUser(userB)).sync.push
+    ).toBe(true);
+    expect(
+      (await NotificationPreferenceService.getForUser(userA)).sync.push
+    ).toBe(false);
   });
 
   it('bypasses optional suppression for mandatory policy', async () => {
@@ -224,26 +227,51 @@ describe('notification preference foundation', () => {
       general: { realtime: false },
     });
     expect(result.sync).toEqual({ inbox: true, realtime: true, push: false });
-    expect(result.general).toEqual({ inbox: true, realtime: false, push: true });
-    expect(result.subscription).toEqual({ inbox: true, realtime: true, push: true });
-    expect(await NotificationPreferenceService.getForUser(userId)).toEqual(result);
+    expect(result.general).toEqual({
+      inbox: true,
+      realtime: false,
+      push: true,
+    });
+    expect(result.subscription).toEqual({
+      inbox: true,
+      realtime: true,
+      push: true,
+    });
+    expect(await NotificationPreferenceService.getForUser(userId)).toEqual(
+      result
+    );
   });
 
   it('rejects unknown categories, channels, fields, invalid values, and empty patches', () => {
-    expect(notificationPreferencePatchSchema.safeParse({ unknown: { push: true } }).success).toBe(false);
-    expect(notificationPreferencePatchSchema.safeParse({ sync: { email: true } }).success).toBe(false);
-    expect(notificationPreferencePatchSchema.safeParse({ sync: { push: 'false' } }).success).toBe(false);
+    expect(
+      notificationPreferencePatchSchema.safeParse({ unknown: { push: true } })
+        .success
+    ).toBe(false);
+    expect(
+      notificationPreferencePatchSchema.safeParse({ sync: { email: true } })
+        .success
+    ).toBe(false);
+    expect(
+      notificationPreferencePatchSchema.safeParse({ sync: { push: 'false' } })
+        .success
+    ).toBe(false);
     expect(notificationPreferencePatchSchema.safeParse({}).success).toBe(false);
   });
 
   it('defines exactly one explicit category and policy for every event and rejects unknown events', () => {
-    expect(Object.keys(NOTIFICATION_EVENT_DEFINITIONS)).toHaveLength(NOTIFICATION_EVENTS.length);
+    expect(Object.keys(NOTIFICATION_EVENT_DEFINITIONS)).toHaveLength(
+      NOTIFICATION_EVENTS.length
+    );
     for (const event of NOTIFICATION_EVENTS) {
       const definition = definitionForEvent(event);
-      expect(['sync', 'subscription', 'security', 'general']).toContain(definition.category);
+      expect(['sync', 'subscription', 'security', 'general']).toContain(
+        definition.category
+      );
       expect(['optional', 'mandatory']).toContain(definition.policy);
     }
-    expect(() => definitionForEvent('future.unknown')).toThrow('UNKNOWN_NOTIFICATION_EVENT');
+    expect(() => definitionForEvent('future.unknown')).toThrow(
+      'UNKNOWN_NOTIFICATION_EVENT'
+    );
   });
 
   it('returns only canonical channels and resolves each optional channel independently', async () => {
@@ -251,7 +279,13 @@ describe('notification preference foundation', () => {
     await NotificationPreferenceService.updateForUser(userId, {
       sync: { inbox: true, realtime: false, push: true },
     });
-    expect(await NotificationService.resolveChannelsForUser(userId, 'sync', 'optional')).toEqual(['inbox', 'push']);
+    expect(
+      await NotificationService.resolveChannelsForUser(
+        userId,
+        'sync',
+        'optional'
+      )
+    ).toEqual(['inbox', 'push']);
     expect(NOTIFICATION_CHANNELS).toEqual(['inbox', 'realtime', 'push']);
   });
 
@@ -259,7 +293,11 @@ describe('notification preference foundation', () => {
     const notificationId = new Types.ObjectId();
     const userId = new Types.ObjectId();
     await UserNotification.create({ notificationId, userId });
-    await expect(UserNotification.create({ notificationId, userId })).rejects.toMatchObject({ code: 11000 });
-    expect(await UserNotification.countDocuments({ notificationId, userId })).toBe(1);
+    await expect(
+      UserNotification.create({ notificationId, userId })
+    ).rejects.toMatchObject({ code: 11000 });
+    expect(
+      await UserNotification.countDocuments({ notificationId, userId })
+    ).toBe(1);
   });
 });

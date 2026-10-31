@@ -82,7 +82,8 @@ describe('Telemetry events (anonymous, opt-in)', () => {
     expect((await send(batch({ userId: 'abc' }))).status).toBe(400);
     expect((await send(batch({ email: 'a@b.c' }))).status).toBe(400);
     expect(
-      (await send(batch({ events: [{ name: 'transaction_amount_9000' }] }))).status
+      (await send(batch({ events: [{ name: 'transaction_amount_9000' }] })))
+        .status
     ).toBe(400);
     expect(
       (await send(batch({ events: [{ name: 'app_open', note: 'free text' }] })))
@@ -94,7 +95,9 @@ describe('Telemetry events (anonymous, opt-in)', () => {
     expect(
       (
         await send(
-          batch({ events: Array.from({ length: 26 }, () => ({ name: 'app_open' })) })
+          batch({
+            events: Array.from({ length: 26 }, () => ({ name: 'app_open' })),
+          })
         )
       ).status
     ).toBe(400);
@@ -118,8 +121,8 @@ describe('Telemetry events (anonymous, opt-in)', () => {
       },
       now
     );
-    const times = (await TelemetryEvent.find().sort({ at: 1 }).lean()).map((d) =>
-      d.at.getTime()
+    const times = (await TelemetryEvent.find().sort({ at: 1 }).lean()).map(
+      (d) => d.at.getTime()
     );
     expect(times).toEqual([
       now.getTime() - 60_000,
@@ -159,7 +162,9 @@ describe('Telemetry events (anonymous, opt-in)', () => {
     const indexes = await TelemetryEvent.collection.indexes();
     const ttl = indexes.find((i) => i.expireAfterSeconds !== undefined);
     expect(ttl?.key).toEqual({ at: 1 });
-    expect(ttl?.expireAfterSeconds).toBe(TELEMETRY_RETENTION_DAYS * 24 * 60 * 60);
+    expect(ttl?.expireAfterSeconds).toBe(
+      TELEMETRY_RETENTION_DAYS * 24 * 60 * 60
+    );
   });
 
   it('limits how often one account can report', async () => {
@@ -194,7 +199,9 @@ describe('Telemetry events (anonymous, opt-in)', () => {
             .auth(mod, { type: 'bearer' })
         ).status
       ).toBe(200);
-      expect((await request(app).get('/v1/admin/telemetry/summary')).status).toBe(401);
+      expect(
+        (await request(app).get('/v1/admin/telemetry/summary')).status
+      ).toBe(401);
     });
 
     it('aggregates counts, installs and activation, and validates the window', async () => {
@@ -210,7 +217,11 @@ describe('Telemetry events (anonymous, opt-in)', () => {
           },
           now
         );
-      await rec(INSTALL, ['app_open', 'transaction_added', 'transaction_added']);
+      await rec(INSTALL, [
+        'app_open',
+        'transaction_added',
+        'transaction_added',
+      ]);
       await rec(OTHER_INSTALL, ['app_open']);
 
       const mod = await tokenFor(UserRole.Moderator, 'summary@example.test');

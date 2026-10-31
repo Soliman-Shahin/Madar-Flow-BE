@@ -13,27 +13,18 @@ router.use(verifyAccessToken);
 /**
  * Get current user's scopes
  */
-router.get(
-  '/me',
-  scopeController.getMyScopes.bind(scopeController)
-);
+router.get('/me', scopeController.getMyScopes.bind(scopeController));
 
 /**
  * Check if current user has a specific scope
  */
-router.get(
-  '/check/:scope',
-  scopeController.checkScope.bind(scopeController)
-);
+router.get('/check/:scope', scopeController.checkScope.bind(scopeController));
 
 /**
  * Get missing scopes for current user
  * Body: { scopes: PermissionScope[] }
  */
-router.post(
-  '/missing',
-  scopeController.getMissingScopes.bind(scopeController)
-);
+router.post('/missing', scopeController.getMissingScopes.bind(scopeController));
 
 // ==================== SCOPE INFORMATION (Admin+) ====================
 

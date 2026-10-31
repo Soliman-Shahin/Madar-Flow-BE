@@ -24,7 +24,11 @@ function sections(doc: Plain | null): Plain {
     // Mongoose defaults arrays to []; an empty section means "not configured".
     if (value === undefined || value === null) continue;
     if (Array.isArray(value) && value.length === 0) continue;
-    if (key === 'support' && Array.isArray(value.links) && !value.links.length) {
+    if (
+      key === 'support' &&
+      Array.isArray(value.links) &&
+      !value.links.length
+    ) {
       const { links, ...rest } = value;
       out[key] = rest;
       continue;

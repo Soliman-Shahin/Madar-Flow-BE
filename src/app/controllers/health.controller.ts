@@ -171,7 +171,9 @@ export const detailedHealthCheck = async (req: Request, res: Response) => {
   try {
     const health = await performHealthChecks();
     const statusCode = health.status === 'unhealthy' ? 503 : 200;
-    return res.status(statusCode).json({ status: health.status, timestamp: health.timestamp });
+    return res
+      .status(statusCode)
+      .json({ status: health.status, timestamp: health.timestamp });
   } catch (error: any) {
     return sendError(res, 'Health check failed', 500, 'HEALTH_CHECK_FAILED');
   }

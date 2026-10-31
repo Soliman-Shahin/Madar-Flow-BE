@@ -1,6 +1,13 @@
-import { BadRequestError, ConflictError, NotFoundError } from '../shared/errors';
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from '../shared/errors';
 import mongoose from 'mongoose';
-import { TemporaryPermission, ITemporaryPermission } from '../models/temporary-permission.model';
+import {
+  TemporaryPermission,
+  ITemporaryPermission,
+} from '../models/temporary-permission.model';
 import { Permission } from '../types/permissions.types';
 import { auditLogService } from './audit-log.service';
 import { permissionCacheService } from './permission-cache.service';
@@ -10,7 +17,7 @@ import logger from './logger.service';
 
 /**
  * Temporary Permission Service
- * 
+ *
  * Manages time-limited permissions for users.
  */
 class TemporaryPermissionService {
@@ -98,7 +105,8 @@ class TemporaryPermissionService {
     reason?: string
   ): Promise<ITemporaryPermission> {
     try {
-      const tempPermission = await TemporaryPermission.findById(tempPermissionId);
+      const tempPermission =
+        await TemporaryPermission.findById(tempPermissionId);
 
       if (!tempPermission) {
         throw new NotFoundError('Temporary permission');
@@ -113,7 +121,9 @@ class TemporaryPermissionService {
       await tempPermission.save();
 
       // Invalidate user's permission cache
-      await permissionCacheService.invalidateUser(tempPermission.userId.toString());
+      await permissionCacheService.invalidateUser(
+        tempPermission.userId.toString()
+      );
 
       // Log the action
       await auditLogService.log({
@@ -166,7 +176,10 @@ class TemporaryPermissionService {
   /**
    * Check if user has a specific temporary permission
    */
-  async hasPermission(userId: string, permission: Permission): Promise<boolean> {
+  async hasPermission(
+    userId: string,
+    permission: Permission
+  ): Promise<boolean> {
     try {
       const now = new Date();
       const count = await TemporaryPermission.countDocuments({
@@ -230,7 +243,9 @@ class TemporaryPermissionService {
       }
 
       if (processedCount > 0) {
-        logger.info(`Processed ${processedCount} expired temporary permissions`);
+        logger.info(
+          `Processed ${processedCount} expired temporary permissions`
+        );
       }
 
       return processedCount;
@@ -243,7 +258,9 @@ class TemporaryPermissionService {
   /**
    * Get permissions expiring soon
    */
-  async getExpiringSoon(hoursFromNow: number = 24): Promise<ITemporaryPermission[]> {
+  async getExpiringSoon(
+    hoursFromNow: number = 24
+  ): Promise<ITemporaryPermission[]> {
     try {
       return await TemporaryPermission.findExpiringSoon(hoursFromNow);
     } catch (error: any) {
@@ -262,7 +279,8 @@ class TemporaryPermissionService {
     reason?: string
   ): Promise<ITemporaryPermission> {
     try {
-      const tempPermission = await TemporaryPermission.findById(tempPermissionId);
+      const tempPermission =
+        await TemporaryPermission.findById(tempPermissionId);
 
       if (!tempPermission) {
         throw new NotFoundError('Temporary permission');
@@ -273,12 +291,14 @@ class TemporaryPermissionService {
       }
 
       if (newEndDate <= tempPermission.endDate) {
-        throw new BadRequestError('New end date must be after current end date');
+        throw new BadRequestError(
+          'New end date must be after current end date'
+        );
       }
 
       const oldEndDate = tempPermission.endDate;
       tempPermission.endDate = newEndDate;
-      
+
       if (!tempPermission.metadata) {
         tempPermission.metadata = {};
       }
@@ -290,7 +310,9 @@ class TemporaryPermissionService {
       await tempPermission.save();
 
       // Invalidate user's permission cache
-      await permissionCacheService.invalidateUser(tempPermission.userId.toString());
+      await permissionCacheService.invalidateUser(
+        tempPermission.userId.toString()
+      );
 
       // Log the action
       await auditLogService.log({
@@ -332,27 +354,29 @@ class TemporaryPermissionService {
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-      const [total, active, expired, revoked, expiringSoon] = await Promise.all([
-        TemporaryPermission.countDocuments(),
-        TemporaryPermission.countDocuments({
-          isActive: true,
-          startDate: { $lte: now },
-          endDate: { $gte: now },
-        }),
-        TemporaryPermission.countDocuments({
-          isActive: true,
-          endDate: { $lt: now },
-        }),
-        TemporaryPermission.countDocuments({
-          isActive: false,
-          revokedAt: { $exists: true },
-        }),
-        TemporaryPermission.countDocuments({
-          isActive: true,
-          startDate: { $lte: now },
-          endDate: { $gte: now, $lte: tomorrow },
-        }),
-      ]);
+      const [total, active, expired, revoked, expiringSoon] = await Promise.all(
+        [
+          TemporaryPermission.countDocuments(),
+          TemporaryPermission.countDocuments({
+            isActive: true,
+            startDate: { $lte: now },
+            endDate: { $gte: now },
+          }),
+          TemporaryPermission.countDocuments({
+            isActive: true,
+            endDate: { $lt: now },
+          }),
+          TemporaryPermission.countDocuments({
+            isActive: false,
+            revokedAt: { $exists: true },
+          }),
+          TemporaryPermission.countDocuments({
+            isActive: true,
+            startDate: { $lte: now },
+            endDate: { $gte: now, $lte: tomorrow },
+          }),
+        ]
+      );
 
       return {
         total,
@@ -362,7 +386,10 @@ class TemporaryPermissionService {
         expiringSoon,
       };
     } catch (error: any) {
-      logger.error('Error getting temporary permission statistics:', error.message);
+      logger.error(
+        'Error getting temporary permission statistics:',
+        error.message
+      );
       throw error;
     }
   }

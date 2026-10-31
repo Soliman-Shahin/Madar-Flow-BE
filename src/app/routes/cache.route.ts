@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { cacheController } from '../controllers/cache.controller';
 import { verifyAccessToken } from '../middleware/access.middleware';
-import { requireAdmin, requireSuperAdmin } from '../middleware/admin.middleware';
+import {
+  requireAdmin,
+  requireSuperAdmin,
+} from '../middleware/admin.middleware';
 
 const router = Router();
 

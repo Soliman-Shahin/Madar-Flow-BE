@@ -12,8 +12,12 @@ import logger from '../services/logger.service';
  */
 
 const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
+  value.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[
+        c
+      ]!
   );
 
 const STYLE = `

@@ -117,19 +117,19 @@ describe('expired embedded session cleanup', () => {
     const user = await User.create({
       email: 'refresh-first@example.test',
       password: 'not-used',
-      sessions: [{
-        sessionId: crypto.randomUUID(),
-        token: crypto.createHash('sha256').update(refreshToken).digest('hex'),
-        expiresAt: now + 60,
-      }],
+      sessions: [
+        {
+          sessionId: crypto.randomUUID(),
+          token: crypto.createHash('sha256').update(refreshToken).digest('hex'),
+          expiresAt: now + 60,
+        },
+      ],
     });
 
     const rotated = await UserService.rotateRefreshToken(refreshToken);
     expect(rotated).not.toBeNull();
     await SessionCleanupService.cleanupExpiredSessions(atSeconds(now));
-    expect(
-      (await User.findById(user._id))!.sessions
-    ).toHaveLength(1);
+    expect((await User.findById(user._id))!.sessions).toHaveLength(1);
 
     const expiredToken = crypto.randomBytes(64).toString('hex');
     await User.updateOne(
@@ -137,7 +137,10 @@ describe('expired embedded session cleanup', () => {
       {
         $push: {
           sessions: {
-            token: crypto.createHash('sha256').update(expiredToken).digest('hex'),
+            token: crypto
+              .createHash('sha256')
+              .update(expiredToken)
+              .digest('hex'),
             expiresAt: now,
           },
         },
@@ -232,12 +235,16 @@ describe('session cleanup job', () => {
 
   it('skips an overlapping execution and runs again after completion', async () => {
     const job = new SessionCleanupJob();
-    let release!: (value: { matchedUsers: number; modifiedUsers: number }) => void;
-    const pending = new Promise<{ matchedUsers: number; modifiedUsers: number }>(
-      (resolve) => {
-        release = resolve;
-      }
-    );
+    let release!: (value: {
+      matchedUsers: number;
+      modifiedUsers: number;
+    }) => void;
+    const pending = new Promise<{
+      matchedUsers: number;
+      modifiedUsers: number;
+    }>((resolve) => {
+      release = resolve;
+    });
     const service = jest
       .spyOn(SessionCleanupService, 'cleanupExpiredSessions')
       .mockReturnValueOnce(pending)

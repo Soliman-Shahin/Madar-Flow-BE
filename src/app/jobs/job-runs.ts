@@ -78,10 +78,7 @@ class JobRunRegistry {
     state.lastError = errorMessage(error);
   }
 
-  async track<T>(
-    name: string,
-    task: () => Promise<T>
-  ): Promise<T | undefined> {
+  async track<T>(name: string, task: () => Promise<T>): Promise<T | undefined> {
     const state = this.ensure(name);
     if (state.running) return undefined;
     const startedAt = new Date();

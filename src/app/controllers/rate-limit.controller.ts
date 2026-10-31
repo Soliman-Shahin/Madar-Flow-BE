@@ -6,7 +6,7 @@ import logger from '../services/logger.service';
 
 /**
  * Rate Limit Controller
- * 
+ *
  * Provides information about rate limits for users
  */
 class RateLimitController {
@@ -33,7 +33,9 @@ class RateLimitController {
             windowMs: limitInfo.windowMs,
             windowMinutes: Math.floor(limitInfo.windowMs / 60000),
             maxRequests: limitInfo.max,
-            requestsPerMinute: Math.floor(limitInfo.max / (limitInfo.windowMs / 60000)),
+            requestsPerMinute: Math.floor(
+              limitInfo.max / (limitInfo.windowMs / 60000)
+            ),
           },
           headers: {
             'X-RateLimit-Limit': limitInfo.max,
@@ -81,7 +83,12 @@ class RateLimitController {
       );
     } catch (error: any) {
       logger.error('Error getting rate limit status:', error.message);
-      sendError(res, 'Failed to retrieve rate limit status', 500, 'INTERNAL_ERROR');
+      sendError(
+        res,
+        'Failed to retrieve rate limit status',
+        500,
+        'INTERNAL_ERROR'
+      );
     }
   }
 }

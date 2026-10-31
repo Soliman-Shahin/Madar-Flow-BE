@@ -80,11 +80,21 @@ export const handleSyncError = (
     // Missing / already-resolved conflicts are client errors, not server failures.
     const raw = String(error?.message || '');
     if (raw.includes('Conflict not found or already resolved')) {
-      sendError(res, 'Conflict not found or already resolved', 404, 'SYNC_CONFLICT_NOT_FOUND');
+      sendError(
+        res,
+        'Conflict not found or already resolved',
+        404,
+        'SYNC_CONFLICT_NOT_FOUND'
+      );
       return;
     }
     if (raw.includes('Conflict already resolved with a different choice')) {
-      sendError(res, 'Conflict already resolved with a different choice', 409, 'SYNC_CONFLICT_ALREADY_RESOLVED');
+      sendError(
+        res,
+        'Conflict already resolved with a different choice',
+        409,
+        'SYNC_CONFLICT_ALREADY_RESOLVED'
+      );
       return;
     }
 

@@ -26,9 +26,12 @@ const post = (path: string, body: Record<string, unknown>) =>
   request(app)
     .post(`/v1/user${path}`)
     .set('X-Forwarded-For', `10.1.0.${++ip}`)
-    .send(path.startsWith('/password/') ? body : { data: encryptCryptoJS(body) });
+    .send(
+      path.startsWith('/password/') ? body : { data: encryptCryptoJS(body) }
+    );
 
-const signup = (email: string) => post('/signup', { email, password: PASSWORD, ...consent });
+const signup = (email: string) =>
+  post('/signup', { email, password: PASSWORD, ...consent });
 
 describe('normalizeEmail helpers', () => {
   it('trims and lowercases, and masks for logs', () => {
@@ -44,9 +47,14 @@ describe('e-mail case handling', () => {
 
   it('stores a mixed-case signup lowercase and logs in with any case', async () => {
     expect((await signup('Mixed.Case@Example.Test')).status).toBe(200);
-    expect(await User.exists({ email: 'mixed.case@example.test' })).toBeTruthy();
+    expect(
+      await User.exists({ email: 'mixed.case@example.test' })
+    ).toBeTruthy();
 
-    const login = await post('/login', { email: 'MIXED.CASE@example.test', password: PASSWORD });
+    const login = await post('/login', {
+      email: 'MIXED.CASE@example.test',
+      password: PASSWORD,
+    });
     expect(login.status).toBe(200);
   });
 
@@ -58,7 +66,9 @@ describe('e-mail case handling', () => {
 
   it('finds the account for forgot-password in any case', async () => {
     await signup('Sara@Example.Test');
-    const send = jest.spyOn(MailService, 'sendPasswordReset').mockResolvedValue();
+    const send = jest
+      .spyOn(MailService, 'sendPasswordReset')
+      .mockResolvedValue();
     await post('/password/forgot', { email: 'SARA@example.test' });
     expect(send).toHaveBeenCalledTimes(1);
   });
@@ -79,6 +89,8 @@ describe('e-mail case handling', () => {
       .send({ idToken: 'synthetic-google-credential' });
     expect(res.status).toBe(200);
     expect(await User.countDocuments()).toBe(1);
-    expect(String(res.body.data.user._id)).toBe(String(created.body.data.user._id));
+    expect(String(res.body.data.user._id)).toBe(
+      String(created.body.data.user._id)
+    );
   });
 });

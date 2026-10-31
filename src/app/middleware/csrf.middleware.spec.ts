@@ -12,7 +12,8 @@ function buildApp() {
   app.use(express.json());
   app.use(cookieParser());
   app.use(conditionalCsrfProtection);
-  const ok = (_req: Request, res: Response) => res.status(200).json({ ok: true });
+  const ok = (_req: Request, res: Response) =>
+    res.status(200).json({ ok: true });
   app.post('/v1/user/signup', ok);
   app.post('/v1/user/login', ok);
   app.get('/v1/user/csrf-token', issueCsrfToken);
@@ -67,14 +68,13 @@ describe('conditionalCsrfProtection', () => {
       .get('/v1/user/csrf-token')
       .set('X-Auth-Cookie-Path', '/v1/user');
     const setCookieHeaders = tokenResponse.headers['set-cookie'];
-    const cookies = (Array.isArray(setCookieHeaders)
-      ? setCookieHeaders
-      : setCookieHeaders
-        ? [setCookieHeaders]
-        : []
-    ).map(
-      (cookie: string) => cookie.split(';')[0]
-    );
+    const cookies = (
+      Array.isArray(setCookieHeaders)
+        ? setCookieHeaders
+        : setCookieHeaders
+          ? [setCookieHeaders]
+          : []
+    ).map((cookie: string) => cookie.split(';')[0]);
     const refreshSecret = cookies.find((cookie: string) =>
       cookie.startsWith('_csrf=')
     );
@@ -82,7 +82,10 @@ describe('conditionalCsrfProtection', () => {
       .post('/v1/user/logout')
       .set('X-Auth-Transport', 'cookie')
       .set('X-CSRF-Token', tokenResponse.body.csrfToken)
-      .set('Cookie', [...cookies, 'mf_refresh=synthetic-refresh-credential'].join('; '))
+      .set(
+        'Cookie',
+        [...cookies, 'mf_refresh=synthetic-refresh-credential'].join('; ')
+      )
       .send({});
     expect(tokenResponse.status).toBe(200);
     expect(refreshSecret).toBeDefined();

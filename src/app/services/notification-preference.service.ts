@@ -54,7 +54,11 @@ export class NotificationPreferenceService {
       $set: categoryUpdates,
       $setOnInsert: defaultsOnInsert,
     };
-    const options = { upsert: true, returnDocument: 'after' as const, setDefaultsOnInsert: true };
+    const options = {
+      upsert: true,
+      returnDocument: 'after' as const,
+      setDefaultsOnInsert: true,
+    };
 
     let record;
     try {

@@ -28,7 +28,9 @@ const PRIVATE_USER_FIELDS = [
   'accountDeletionTokenHash',
   'accountDeletionExpiresAt',
 ] as const;
-const PRIVATE_USER_PROJECTION = PRIVATE_USER_FIELDS.map((field) => `-${field}`).join(' ');
+const PRIVATE_USER_PROJECTION = PRIVATE_USER_FIELDS.map(
+  (field) => `-${field}`
+).join(' ');
 
 function stripPrivateUserFields<T extends Record<string, any>>(user: T): T {
   const copy: Record<string, any> = { ...user };
@@ -94,7 +96,16 @@ export class AdminService {
     sortField: string = 'createdAt',
     sortOrder: number = -1
   ) {
-    sortField = safeSortField(sortField, 'createdAt', ['createdAt','updatedAt','email','role','plan','isActive','_isDeleted','emailVerified']);
+    sortField = safeSortField(sortField, 'createdAt', [
+      'createdAt',
+      'updatedAt',
+      'email',
+      'role',
+      'plan',
+      'isActive',
+      '_isDeleted',
+      'emailVerified',
+    ]);
     try {
       const query: any = {};
 
@@ -406,7 +417,16 @@ export class AdminService {
     sortField: string = 'createdAt',
     sortOrder: number = -1
   ) {
-    sortField = safeSortField(sortField, 'createdAt', ['createdAt','updatedAt','title','type','isDefault','isActive','order','_isDeleted']);
+    sortField = safeSortField(sortField, 'createdAt', [
+      'createdAt',
+      'updatedAt',
+      'title',
+      'type',
+      'isDefault',
+      'isActive',
+      'order',
+      '_isDeleted',
+    ]);
     try {
       const query: any = {};
 
@@ -661,7 +681,14 @@ export class AdminService {
     sortField: string = 'date',
     sortOrder: number = -1
   ) {
-    sortField = safeSortField(sortField, 'date', ['date','createdAt','updatedAt','amount','description','_isDeleted']);
+    sortField = safeSortField(sortField, 'date', [
+      'date',
+      'createdAt',
+      'updatedAt',
+      'amount',
+      'description',
+      '_isDeleted',
+    ]);
     try {
       const query: any = {};
 

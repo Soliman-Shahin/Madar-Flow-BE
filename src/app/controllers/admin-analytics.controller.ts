@@ -12,13 +12,13 @@ import {
 
 const dateParam = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const periodFields = {
-    days: z.enum(['7', '30', '90']).optional(),
-    start: dateParam.optional(),
-    end: dateParam.optional(),
-    compare: z.enum(['previous', 'yearAgo']).default('previous'),
-    plan: z.enum(PlanSlug).optional(),
-    type: z.enum(['income', 'outcome']).optional(),
-  };
+  days: z.enum(['7', '30', '90']).optional(),
+  start: dateParam.optional(),
+  end: dateParam.optional(),
+  compare: z.enum(['previous', 'yearAgo']).default('previous'),
+  plan: z.enum(PlanSlug).optional(),
+  type: z.enum(['income', 'outcome']).optional(),
+};
 const validatePeriod = (
   value: { days?: string; start?: string; end?: string },
   context: z.RefinementCtx
@@ -32,22 +32,25 @@ const validatePeriod = (
   }
 };
 const periodQuery = z.object(periodFields).strict().superRefine(validatePeriod);
-const recordsQuery = z.object({
-  ...periodFields,
-  asOf: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  kind: z.enum(['newUsers', 'recordingUsers', 'expenses']),
-  day: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-  page: z
-    .string()
-    .regex(/^[1-9]\d{0,3}$/)
-    .default('1'),
-}).strict().superRefine(validatePeriod);
+const recordsQuery = z
+  .object({
+    ...periodFields,
+    asOf: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    kind: z.enum(['newUsers', 'recordingUsers', 'expenses']),
+    day: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    page: z
+      .string()
+      .regex(/^[1-9]\d{0,3}$/)
+      .default('1'),
+  })
+  .strict()
+  .superRefine(validatePeriod);
 
 function periodSelection(value: {
   days?: string;
@@ -117,7 +120,9 @@ export const adminAnalyticsController = {
           .string()
           .regex(/^[1-9]\d{0,3}$/)
           .default('1'),
-      }).strict().superRefine(validatePeriod)
+      })
+      .strict()
+      .superRefine(validatePeriod)
       .safeParse(req.query);
     if (!query.success)
       return sendError(

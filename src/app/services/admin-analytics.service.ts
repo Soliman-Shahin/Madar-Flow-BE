@@ -127,9 +127,7 @@ export function resolveAnalyticsPeriod(
   const end =
     typeof selection === 'number'
       ? today
-      : new Date(
-          new Date(`${selection.end}T00:00:00.000Z`).getTime() + DAY
-        );
+      : new Date(new Date(`${selection.end}T00:00:00.000Z`).getTime() + DAY);
   const days = Math.round((end.getTime() - start.getTime()) / DAY);
   if (
     !Number.isFinite(start.getTime()) ||
@@ -147,9 +145,7 @@ export function resolveAnalyticsPeriod(
     );
   }
   const previousEnd =
-    activeComparison === 'previous'
-      ? start
-      : shiftUtcYear(end, -1);
+    activeComparison === 'previous' ? start : shiftUtcYear(end, -1);
   const previousStart = new Date(previousEnd.getTime() - days * DAY);
   return {
     days,
@@ -520,14 +516,16 @@ export class AdminAnalyticsService {
       $or: [{ planExpiresAt: null }, { planExpiresAt: { $gt: now } }],
     };
     const activeExpr = {
-      $and: [
-        { $gte: ['$last', period.start] },
-        { $lt: ['$last', period.end] },
-      ],
+      $and: [{ $gte: ['$last', period.start] }, { $lt: ['$last', period.end] }],
     };
     const paidExpr = {
       $and: [
-        { $in: [{ $ifNull: ['$plan', 'free'] }, [PlanSlug.Pro, PlanSlug.Premium]] },
+        {
+          $in: [
+            { $ifNull: ['$plan', 'free'] },
+            [PlanSlug.Pro, PlanSlug.Premium],
+          ],
+        },
         {
           $or: [
             { $eq: [{ $ifNull: ['$planExpiresAt', null] }, null] },

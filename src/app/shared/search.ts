@@ -23,8 +23,16 @@ const SECRET_SORT_FIELDS = /password|session|token|hash|secret|salary/i;
  * With `allowed`, only listed fields pass; without it, only plain identifiers that do not look
  * secret. Anything else falls back to the default sort.
  */
-export function safeSortField(raw: unknown, fallback: string, allowed?: readonly string[]): string {
-  if (typeof raw !== 'string' || !SORT_FIELD_PATTERN.test(raw) || SECRET_SORT_FIELDS.test(raw)) {
+export function safeSortField(
+  raw: unknown,
+  fallback: string,
+  allowed?: readonly string[]
+): string {
+  if (
+    typeof raw !== 'string' ||
+    !SORT_FIELD_PATTERN.test(raw) ||
+    SECRET_SORT_FIELDS.test(raw)
+  ) {
     return fallback;
   }
   if (allowed && !allowed.includes(raw)) return fallback;
@@ -41,7 +49,8 @@ export function exceedsDepth(value: unknown, max: number): boolean {
     const [node, depth] = stack.pop() as [unknown, number];
     if (node === null || typeof node !== 'object') continue;
     if (depth > max) return true;
-    for (const child of Object.values(node as Record<string, unknown>)) stack.push([child, depth + 1]);
+    for (const child of Object.values(node as Record<string, unknown>))
+      stack.push([child, depth + 1]);
   }
   return false;
 }

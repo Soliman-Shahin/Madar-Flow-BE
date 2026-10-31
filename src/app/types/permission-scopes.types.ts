@@ -2,7 +2,7 @@ import { Permission } from './permissions.types';
 
 /**
  * Permission Scopes
- * 
+ *
  * Logical groupings of related permissions for easier management.
  * Scopes use wildcard notation (e.g., 'expenses:*') to represent
  * all permissions within a resource area.
@@ -63,9 +63,7 @@ export const SCOPE_PERMISSIONS: Record<PermissionScope, Permission[]> = {
     Permission.EXPENSE_DELETE,
     Permission.EXPENSE_EXPORT,
   ],
-  [PermissionScope.EXPENSES_READ]: [
-    Permission.EXPENSE_READ,
-  ],
+  [PermissionScope.EXPENSES_READ]: [Permission.EXPENSE_READ],
   [PermissionScope.EXPENSES_WRITE]: [
     Permission.EXPENSE_CREATE,
     Permission.EXPENSE_UPDATE,
@@ -79,9 +77,7 @@ export const SCOPE_PERMISSIONS: Record<PermissionScope, Permission[]> = {
     Permission.CATEGORY_UPDATE,
     Permission.CATEGORY_DELETE,
   ],
-  [PermissionScope.CATEGORIES_READ]: [
-    Permission.CATEGORY_READ,
-  ],
+  [PermissionScope.CATEGORIES_READ]: [Permission.CATEGORY_READ],
   [PermissionScope.CATEGORIES_WRITE]: [
     Permission.CATEGORY_CREATE,
     Permission.CATEGORY_UPDATE,
@@ -93,9 +89,7 @@ export const SCOPE_PERMISSIONS: Record<PermissionScope, Permission[]> = {
     Permission.REPORT_VIEW,
     Permission.REPORT_ADVANCED,
   ],
-  [PermissionScope.REPORTS_BASIC]: [
-    Permission.REPORT_VIEW,
-  ],
+  [PermissionScope.REPORTS_BASIC]: [Permission.REPORT_VIEW],
 
   // ==================== Backup Scopes ====================
   [PermissionScope.BACKUP_FULL]: [
@@ -166,7 +160,7 @@ export function expandScope(scope: PermissionScope): Permission[] {
  */
 export function expandScopes(scopes: PermissionScope[]): Permission[] {
   const permissions = new Set<Permission>();
-  
+
   scopes.forEach((scope) => {
     const scopePerms = expandScope(scope);
     scopePerms.forEach((perm) => permissions.add(perm));
@@ -209,7 +203,9 @@ export function hasAllScopes(
 /**
  * Get all scopes that a user has based on their permissions
  */
-export function getUserScopes(userPermissions: Permission[]): PermissionScope[] {
+export function getUserScopes(
+  userPermissions: Permission[]
+): PermissionScope[] {
   const scopes: PermissionScope[] = [];
 
   Object.entries(SCOPE_PERMISSIONS).forEach(([scope, permissions]) => {
@@ -245,25 +241,21 @@ export const SCOPE_BUNDLES = {
   ],
 
   /** Moderator - read-only admin access */
-  MODERATOR: [
-    PermissionScope.ADMIN_READ,
-  ],
+  MODERATOR: [PermissionScope.ADMIN_READ],
 
   /** Admin - full admin access except plans */
-  ADMIN: [
-    PermissionScope.ADMIN_FULL,
-  ],
+  ADMIN: [PermissionScope.ADMIN_FULL],
 
   /** SuperAdmin - unrestricted access */
-  SUPERADMIN: [
-    PermissionScope.ADMIN_SUPER,
-  ],
+  SUPERADMIN: [PermissionScope.ADMIN_SUPER],
 };
 
 /**
  * Get permissions for a scope bundle
  */
-export function getBundlePermissions(bundleKey: keyof typeof SCOPE_BUNDLES): Permission[] {
+export function getBundlePermissions(
+  bundleKey: keyof typeof SCOPE_BUNDLES
+): Permission[] {
   const scopes = SCOPE_BUNDLES[bundleKey];
   return expandScopes(scopes);
 }

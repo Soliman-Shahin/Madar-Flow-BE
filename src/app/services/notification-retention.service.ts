@@ -47,9 +47,7 @@ export class NotificationRetentionService {
     }
 
     // Recover old canonical orphans left by a crash after association deletion.
-    deletedNotifications += await this.cleanupHistoricalOrphans(
-      cutoff
-    );
+    deletedNotifications += await this.cleanupHistoricalOrphans(cutoff);
 
     return { deletedUserNotifications, deletedNotifications };
   }
@@ -73,9 +71,7 @@ export class NotificationRetentionService {
     return result.deletedCount;
   }
 
-  private static async cleanupHistoricalOrphans(
-    cutoff: Date
-  ): Promise<number> {
+  private static async cleanupHistoricalOrphans(cutoff: Date): Promise<number> {
     let deleted = 0;
     let lastId: Types.ObjectId | undefined;
     while (true) {

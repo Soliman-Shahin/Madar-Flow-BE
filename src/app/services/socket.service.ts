@@ -66,10 +66,17 @@ export class SocketService {
       return next(new Error('Authentication error: Token missing'));
     }
     try {
-      const payload = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string, {
-        algorithms: ['HS256'],
-      }) as any;
-      if (typeof payload?._id !== 'string' || typeof payload?.sid !== 'string') {
+      const payload = jwt.verify(
+        token,
+        process.env.ACCESS_TOKEN_SECRET as string,
+        {
+          algorithms: ['HS256'],
+        }
+      ) as any;
+      if (
+        typeof payload?._id !== 'string' ||
+        typeof payload?.sid !== 'string'
+      ) {
         throw new Error('bad payload');
       }
       const doc = await User.findById(payload._id)
@@ -80,7 +87,10 @@ export class SocketService {
         doc &&
         !doc._isDeleted &&
         doc.isActive !== false &&
-        doc.sessions?.some((session) => session.sessionId === payload.sid && session.expiresAt > now);
+        doc.sessions?.some(
+          (session) =>
+            session.sessionId === payload.sid && session.expiresAt > now
+        );
       if (!live) throw new Error('inactive');
       (socket as any).user = { id: String(doc!._id), role: doc!.role };
       next();

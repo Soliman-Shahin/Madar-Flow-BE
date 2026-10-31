@@ -8,7 +8,7 @@ import logger from '../services/logger.service';
 
 /**
  * Temporary Permission Controller
- * 
+ *
  * Handles HTTP requests for temporary permission management
  */
 class TemporaryPermissionController {
@@ -25,7 +25,8 @@ class TemporaryPermissionController {
         return sendError(res, 'Unauthorized', 401, 'AUTH_REQUIRED');
       }
 
-      const { userId, permission, startDate, endDate, reason, metadata } = req.body;
+      const { userId, permission, startDate, endDate, reason, metadata } =
+        req.body;
 
       // Validation
       if (!userId || !permission || !startDate || !endDate) {
@@ -89,7 +90,11 @@ class TemporaryPermissionController {
         reason
       );
 
-      sendSuccess(res, tempPermission, 'Temporary permission revoked successfully');
+      sendSuccess(
+        res,
+        tempPermission,
+        'Temporary permission revoked successfully'
+      );
     } catch (error: any) {
       logger.error('Error revoking temporary permission:', error.message);
       if (error instanceof AppError) {
@@ -132,7 +137,11 @@ class TemporaryPermissionController {
         reason
       );
 
-      sendSuccess(res, tempPermission, 'Temporary permission extended successfully');
+      sendSuccess(
+        res,
+        tempPermission,
+        'Temporary permission extended successfully'
+      );
     } catch (error: any) {
       logger.error('Error extending temporary permission:', error.message);
       if (error instanceof AppError) {
@@ -151,7 +160,8 @@ class TemporaryPermissionController {
       const rawUserId = req.params.userId;
       const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
 
-      const permissions = await temporaryPermissionService.getUserPermissions(userId);
+      const permissions =
+        await temporaryPermissionService.getUserPermissions(userId);
 
       sendSuccess(
         res,
@@ -177,7 +187,8 @@ class TemporaryPermissionController {
         return sendError(res, 'Unauthorized', 401, 'AUTH_REQUIRED');
       }
 
-      const permissions = await temporaryPermissionService.getActivePermissions(userId);
+      const permissions =
+        await temporaryPermissionService.getActivePermissions(userId);
 
       sendSuccess(
         res,
@@ -196,9 +207,12 @@ class TemporaryPermissionController {
    */
   async getExpiringSoon(req: Request, res: Response): Promise<void> {
     try {
-      const hours = req.query.hours ? parseInt(req.query.hours as string, 10) : 24;
+      const hours = req.query.hours
+        ? parseInt(req.query.hours as string, 10)
+        : 24;
 
-      const permissions = await temporaryPermissionService.getExpiringSoon(hours);
+      const permissions =
+        await temporaryPermissionService.getExpiringSoon(hours);
 
       sendSuccess(
         res,
@@ -225,7 +239,10 @@ class TemporaryPermissionController {
 
       sendSuccess(res, stats, 'Statistics retrieved successfully');
     } catch (error: any) {
-      logger.error('Error getting temporary permission statistics:', error.message);
+      logger.error(
+        'Error getting temporary permission statistics:',
+        error.message
+      );
       sendError(res, 'Failed to retrieve statistics', 500, 'INTERNAL_ERROR');
     }
   }
@@ -236,7 +253,8 @@ class TemporaryPermissionController {
    */
   async processExpired(req: Request, res: Response): Promise<void> {
     try {
-      const processedCount = await temporaryPermissionService.processExpiredPermissions();
+      const processedCount =
+        await temporaryPermissionService.processExpiredPermissions();
 
       sendSuccess(
         res,
@@ -245,9 +263,15 @@ class TemporaryPermissionController {
       );
     } catch (error: any) {
       logger.error('Error processing expired permissions:', error.message);
-      sendError(res, 'Failed to process expired permissions', 500, 'INTERNAL_ERROR');
+      sendError(
+        res,
+        'Failed to process expired permissions',
+        500,
+        'INTERNAL_ERROR'
+      );
     }
   }
 }
 
-export const temporaryPermissionController = new TemporaryPermissionController();
+export const temporaryPermissionController =
+  new TemporaryPermissionController();

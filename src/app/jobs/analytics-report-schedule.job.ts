@@ -12,9 +12,7 @@ export class AnalyticsReportScheduleJob {
   private task: ScheduledTask | null = null;
   private executing = false;
 
-  constructor(
-    private readonly schedules = analyticsReportScheduleService
-  ) {}
+  constructor(private readonly schedules = analyticsReportScheduleService) {}
 
   start(): void {
     if (this.task) return;

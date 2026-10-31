@@ -56,7 +56,10 @@ describe('App settings (dashboard-managed content)', () => {
     expect(adminRes.body.data.faq).toBeUndefined();
     const publicRes = await request(app).get('/v1/app-settings');
     expect(publicRes.body.data.faq).toBeUndefined();
-    expect(Object.keys(publicRes.body.data).sort()).toEqual(['revision', 'updatedAt']);
+    expect(Object.keys(publicRes.body.data).sort()).toEqual([
+      'revision',
+      'updatedAt',
+    ]);
   });
 
   it('requires staff for reads and SuperAdmin for writes', async () => {

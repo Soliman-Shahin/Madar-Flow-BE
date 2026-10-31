@@ -1,7 +1,11 @@
 import { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { sendError, sendSuccess } from '../shared/helper';
-import { AnalyticsReportScheduleInput, analyticsReportScheduleService, AnalyticsReportScheduleError } from '../services/analytics-report-schedule.service';
+import {
+  AnalyticsReportScheduleInput,
+  analyticsReportScheduleService,
+  AnalyticsReportScheduleError,
+} from '../services/analytics-report-schedule.service';
 import { PlanSlug } from '../types/plan.types';
 
 const scheduleInput = z
@@ -109,7 +113,10 @@ export const analyticsReportScheduleController = {
   },
 
   async setActive(req: Request, res: Response, next: NextFunction) {
-    const parsed = z.object({ active: z.boolean() }).strict().safeParse(req.body);
+    const parsed = z
+      .object({ active: z.boolean() })
+      .strict()
+      .safeParse(req.body);
     if (!parsed.success)
       return sendError(
         res,

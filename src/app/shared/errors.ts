@@ -320,7 +320,12 @@ export function toAppError(error: any): AppError {
     return new AppError('Malformed request body', 400, 'INVALID_JSON', true);
   }
   if (error?.type === 'entity.too.large') {
-    return new AppError('Request body too large', 413, 'PAYLOAD_TOO_LARGE', true);
+    return new AppError(
+      'Request body too large',
+      413,
+      'PAYLOAD_TOO_LARGE',
+      true
+    );
   }
   if (
     typeof error?.type === 'string' &&
@@ -329,7 +334,12 @@ export function toAppError(error: any): AppError {
     error.status >= 400 &&
     error.status < 500
   ) {
-    return new AppError('Unsupported request encoding', error.status, 'BAD_REQUEST', true);
+    return new AppError(
+      'Unsupported request encoding',
+      error.status,
+      'BAD_REQUEST',
+      true
+    );
   }
 
   // Handle Mongoose errors

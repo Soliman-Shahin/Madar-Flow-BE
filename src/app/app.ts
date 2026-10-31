@@ -77,7 +77,12 @@ function configureExpressApp(): express.Application {
   // is a read-only getter in this Express version and the middleware crashes trying to reassign it.
   app.use((req: any, res: any, next: any) => {
     if (req.body && exceedsDepth(req.body, 40)) {
-      return sendError(res, 'Request body is nested too deeply', 400, 'BAD_REQUEST');
+      return sendError(
+        res,
+        'Request body is nested too deeply',
+        400,
+        'BAD_REQUEST'
+      );
     }
     if (req.body) mongoSanitize.sanitize(req.body);
     if (req.params) mongoSanitize.sanitize(req.params);

@@ -16,7 +16,9 @@ describe('health endpoints', () => {
     expect(res.status).toBe(200);
     expect(['healthy', 'degraded']).toContain(res.body.status);
     expect(Object.keys(res.body).sort()).toEqual(['status', 'timestamp']);
-    expect(JSON.stringify(res.body)).not.toMatch(/version|environment|memory|checks/i);
+    expect(JSON.stringify(res.body)).not.toMatch(
+      /version|environment|memory|checks/i
+    );
   });
 
   it('/health/diagnostics is not available anonymously', async () => {
@@ -27,13 +29,17 @@ describe('health endpoints', () => {
 
   it('/health/diagnostics is forbidden for a plain consumer', async () => {
     const token = await tokenFor(UserRole.User, 'hd-user@example.test');
-    const res = await request(app).get('/health/diagnostics').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/health/diagnostics')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(403);
   });
 
   it('/health/diagnostics returns the full report to a moderator', async () => {
     const token = await tokenFor(UserRole.Moderator, 'hd-mod@example.test');
-    const res = await request(app).get('/health/diagnostics').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/health/diagnostics')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.checks).toHaveProperty('database');
     expect(res.body).toHaveProperty('version');

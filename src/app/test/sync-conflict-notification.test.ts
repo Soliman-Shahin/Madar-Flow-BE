@@ -202,20 +202,30 @@ describe('sync.conflict notification producer', () => {
     for (const expected of [1, 2]) {
       const result = await service.pushData(userId, [failedEntity]);
       expect(result.errors).toHaveLength(1);
-      expect(await Notification.countDocuments({ event: 'sync.repeated_failure' })).toBe(0);
-      expect((await SyncFailure.findOne({ user: userId }))?.attemptCount).toBe(expected);
+      expect(
+        await Notification.countDocuments({ event: 'sync.repeated_failure' })
+      ).toBe(0);
+      expect((await SyncFailure.findOne({ user: userId }))?.attemptCount).toBe(
+        expected
+      );
     }
     const third = await service.pushData(userId, [failedEntity]);
     expect(third.errors).toHaveLength(1);
-    expect(await Notification.countDocuments({ event: 'sync.repeated_failure' })).toBe(1);
+    expect(
+      await Notification.countDocuments({ event: 'sync.repeated_failure' })
+    ).toBe(1);
     const failure = await SyncFailure.findOne({ user: userId });
     expect(failure?.terminal).toBe(true);
 
     await service.pushData(userId, [failedEntity]);
 
-    const repeatedNotifications = await Notification.find({ event: 'sync.repeated_failure' }).lean();
+    const repeatedNotifications = await Notification.find({
+      event: 'sync.repeated_failure',
+    }).lean();
     expect(repeatedNotifications).toHaveLength(1);
-    expect(repeatedNotifications[0].dedupeKey).toMatch(`${userId}:sync-repeated-failure:`);
+    expect(repeatedNotifications[0].dedupeKey).toMatch(
+      `${userId}:sync-repeated-failure:`
+    );
     const notification = await Notification.findOne({
       event: 'sync.repeated_failure',
     }).lean();
@@ -228,7 +238,9 @@ describe('sync.conflict notification producer', () => {
         failureCount: 3,
       })
     );
-    expect(JSON.stringify(notification?.metadata)).not.toContain('Invalid expense');
+    expect(JSON.stringify(notification?.metadata)).not.toContain(
+      'Invalid expense'
+    );
   });
 
   it('does not trust forged retry metadata or client sync errors', async () => {
@@ -249,7 +261,9 @@ describe('sync.conflict notification producer', () => {
         order: 0,
       },
     ]);
-    expect(await Notification.countDocuments({ event: 'sync.repeated_failure' })).toBe(0);
+    expect(
+      await Notification.countDocuments({ event: 'sync.repeated_failure' })
+    ).toBe(0);
     expect(await SyncFailure.countDocuments({ user: userId })).toBe(0);
   });
 
@@ -264,11 +278,18 @@ describe('sync.conflict notification producer', () => {
     };
     for (const operationId of ['', 'x', 'bad id', 'a'.repeat(65)]) {
       await service.pushData(userId, [
-        { ...invalidEntity, _operationId: operationId, _retryCount: -1, _maxRetries: 1 },
+        {
+          ...invalidEntity,
+          _operationId: operationId,
+          _retryCount: -1,
+          _maxRetries: 1,
+        },
       ]);
     }
     expect(await SyncFailure.countDocuments({ user: userId })).toBe(0);
-    expect(await Notification.countDocuments({ event: 'sync.repeated_failure' })).toBe(0);
+    expect(
+      await Notification.countDocuments({ event: 'sync.repeated_failure' })
+    ).toBe(0);
   });
 
   it('isolates the same durable operation id across authenticated users', async () => {
@@ -286,8 +307,12 @@ describe('sync.conflict notification producer', () => {
       await service.pushData(userId, [failedEntity]);
       await service.pushData(otherUser, [failedEntity]);
     }
-    expect(await SyncFailure.countDocuments({ operationId: 'shared-operation' })).toBe(2);
-    expect(await Notification.countDocuments({ event: 'sync.repeated_failure' })).toBe(2);
+    expect(
+      await SyncFailure.countDocuments({ operationId: 'shared-operation' })
+    ).toBe(2);
+    expect(
+      await Notification.countDocuments({ event: 'sync.repeated_failure' })
+    ).toBe(2);
   });
 
   it('isolates success, conflict, and ordinary failure in one push batch', async () => {
@@ -342,9 +367,22 @@ describe('sync.conflict notification producer', () => {
     expect(result.processed).toBe(1);
     expect(result.conflicts).toHaveLength(1);
     expect(result.errors).toHaveLength(1);
-    expect(await SyncFailure.findOne({ user: userId, operationId: 'mixed-success' })).toBeNull();
-    expect(await SyncFailure.findOne({ user: userId, operationId: 'mixed-conflict' })).toBeNull();
-    expect((await SyncFailure.findOne({ user: userId, operationId: 'mixed-failure' }))?.attemptCount).toBe(1);
-    expect(await Notification.countDocuments({ event: 'sync.repeated_failure' })).toBe(0);
+    expect(
+      await SyncFailure.findOne({ user: userId, operationId: 'mixed-success' })
+    ).toBeNull();
+    expect(
+      await SyncFailure.findOne({ user: userId, operationId: 'mixed-conflict' })
+    ).toBeNull();
+    expect(
+      (
+        await SyncFailure.findOne({
+          user: userId,
+          operationId: 'mixed-failure',
+        })
+      )?.attemptCount
+    ).toBe(1);
+    expect(
+      await Notification.countDocuments({ event: 'sync.repeated_failure' })
+    ).toBe(0);
   });
 });

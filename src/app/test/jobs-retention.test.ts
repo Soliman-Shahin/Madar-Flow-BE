@@ -19,10 +19,16 @@ const TEMP = Object.values(Permission)[0] as Permission;
 
 describe('audit log retention', () => {
   it('resolves the retention period with a safe lower bound', () => {
-    expect(resolveAuditLogRetentionDays(undefined)).toBe(DEFAULT_AUDIT_LOG_RETENTION_DAYS);
-    expect(resolveAuditLogRetentionDays('not-a-number')).toBe(DEFAULT_AUDIT_LOG_RETENTION_DAYS);
+    expect(resolveAuditLogRetentionDays(undefined)).toBe(
+      DEFAULT_AUDIT_LOG_RETENTION_DAYS
+    );
+    expect(resolveAuditLogRetentionDays('not-a-number')).toBe(
+      DEFAULT_AUDIT_LOG_RETENTION_DAYS
+    );
     expect(resolveAuditLogRetentionDays('180')).toBe(180);
-    expect(resolveAuditLogRetentionDays('1')).toBe(MIN_AUDIT_LOG_RETENTION_DAYS);
+    expect(resolveAuditLogRetentionDays('1')).toBe(
+      MIN_AUDIT_LOG_RETENTION_DAYS
+    );
   });
 
   it('deletes only logs older than the retention period', async () => {

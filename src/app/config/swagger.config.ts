@@ -12,8 +12,7 @@ const swaggerDefinition = {
   info: {
     title: `${BRAND.productName} API`,
     version: '2.0.0',
-    description:
-      `Secure backend API for ${BRAND.productName} with advanced encryption and monitoring`,
+    description: `Secure backend API for ${BRAND.productName} with advanced encryption and monitoring`,
     contact: {
       name: BRAND.companyName,
       email: 'support@expenses-wallet.com',

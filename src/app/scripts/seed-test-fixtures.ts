@@ -19,20 +19,57 @@ import { Expense } from '../models/expense.model';
 import { PlanSlug } from '../types/plan.types';
 import { validatePassword } from '../services/password-validation.service';
 
-const ACCOUNTS: Array<{ name: string; role: UserRole; plan: PlanSlug; currency?: string }> = [
-  { name: 'qa-user-free', role: UserRole.User, plan: PlanSlug.Free, currency: 'EGP' },
-  { name: 'qa-user-pro', role: UserRole.User, plan: PlanSlug.Pro, currency: 'EGP' },
-  { name: 'qa-user-premium', role: UserRole.User, plan: PlanSlug.Premium, currency: 'EGP' },
-  { name: 'qa-moderator', role: UserRole.Moderator, plan: PlanSlug.Free, currency: 'EGP' },
-  { name: 'qa-admin', role: UserRole.Admin, plan: PlanSlug.Free, currency: 'EGP' },
-  { name: 'qa-superadmin', role: UserRole.SuperAdmin, plan: PlanSlug.Free, currency: 'EGP' },
+const ACCOUNTS: Array<{
+  name: string;
+  role: UserRole;
+  plan: PlanSlug;
+  currency?: string;
+}> = [
+  {
+    name: 'qa-user-free',
+    role: UserRole.User,
+    plan: PlanSlug.Free,
+    currency: 'EGP',
+  },
+  {
+    name: 'qa-user-pro',
+    role: UserRole.User,
+    plan: PlanSlug.Pro,
+    currency: 'EGP',
+  },
+  {
+    name: 'qa-user-premium',
+    role: UserRole.User,
+    plan: PlanSlug.Premium,
+    currency: 'EGP',
+  },
+  {
+    name: 'qa-moderator',
+    role: UserRole.Moderator,
+    plan: PlanSlug.Free,
+    currency: 'EGP',
+  },
+  {
+    name: 'qa-admin',
+    role: UserRole.Admin,
+    plan: PlanSlug.Free,
+    currency: 'EGP',
+  },
+  {
+    name: 'qa-superadmin',
+    role: UserRole.SuperAdmin,
+    plan: PlanSlug.Free,
+    currency: 'EGP',
+  },
   // No currency on purpose: exercises the first-sign-in currency prompt.
   { name: 'qa-user-nocurrency', role: UserRole.User, plan: PlanSlug.Free },
 ];
 
 function assertLocal(uri: string | undefined): void {
   if (!uri || !/^mongodb:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(uri)) {
-    console.error('Refusing to seed: MONGO_URI must be a localhost/127.0.0.1 MongoDB.');
+    console.error(
+      'Refusing to seed: MONGO_URI must be a localhost/127.0.0.1 MongoDB.'
+    );
     process.exit(1);
   }
 }
@@ -55,7 +92,16 @@ async function main() {
     users[a.name] = await User.findOneAndUpdate(
       { email },
       {
-        $set: { email, password: hash, role: a.role, plan: a.plan, isActive: true, emailVerified: true, sessions: [], ...(a.currency ? { currency: a.currency } : {}) },
+        $set: {
+          email,
+          password: hash,
+          role: a.role,
+          plan: a.plan,
+          isActive: true,
+          emailVerified: true,
+          sessions: [],
+          ...(a.currency ? { currency: a.currency } : {}),
+        },
       },
       { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
@@ -90,7 +136,9 @@ async function main() {
     }))
   );
 
-  console.log(`Seeded ${ACCOUNTS.length} QA accounts, ${cats.length} categories, 12 expenses.`);
+  console.log(
+    `Seeded ${ACCOUNTS.length} QA accounts, ${cats.length} categories, 12 expenses.`
+  );
   await mongoose.disconnect();
   process.exit(0);
 }

@@ -5,7 +5,7 @@ import { Role } from '../types/role.types';
 
 /**
  * Permission Matrix Controller
- * 
+ *
  * Provides HTTP handlers for permission matrix operations:
  * - View complete permission matrix
  * - Compare plans and roles
@@ -17,7 +17,7 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/matrix
    * Get complete permission matrix
-   * 
+   *
    * @access Admin
    */
   async getMatrix(req: Request, res: Response): Promise<void> {
@@ -40,10 +40,10 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/export
    * Export permission matrix in specified format
-   * 
+   *
    * Query params:
    * - format: json | csv | markdown (default: json)
-   * 
+   *
    * @access Admin
    */
   async exportMatrix(req: Request, res: Response): Promise<void> {
@@ -78,7 +78,10 @@ class PermissionMatrixController {
 
       // Set headers for file download
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`
+      );
       res.status(200).send(content);
     } catch (error: any) {
       res.status(500).json({
@@ -92,11 +95,11 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/compare/plans
    * Compare two subscription plans
-   * 
+   *
    * Query params:
    * - plan1: PlanSlug (required)
    * - plan2: PlanSlug (required)
-   * 
+   *
    * @access Admin
    */
   async comparePlans(req: Request, res: Response): Promise<void> {
@@ -132,11 +135,11 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/compare/roles
    * Compare two roles
-   * 
+   *
    * Query params:
    * - role1: Role (required)
    * - role2: Role (required)
-   * 
+   *
    * @access Admin
    */
   async compareRoles(req: Request, res: Response): Promise<void> {
@@ -172,13 +175,13 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/visualization
    * Get visualization data for charts and graphs
-   * 
+   *
    * Returns:
    * - Permissions by group (pie chart)
    * - Permissions by plan (bar chart)
    * - Permissions by role (bar chart)
    * - Coverage matrix (heatmap)
-   * 
+   *
    * @access Admin
    */
   async getVisualizationData(req: Request, res: Response): Promise<void> {
@@ -201,7 +204,7 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/summary
    * Get a quick summary of the permission system
-   * 
+   *
    * @access Admin
    */
   async getSummary(req: Request, res: Response): Promise<void> {
@@ -214,12 +217,15 @@ class PermissionMatrixController {
         totalPlans: matrix.metadata.totalPlans,
         totalRoles: matrix.metadata.totalRoles,
         totalScopes: matrix.metadata.totalScopes,
-        
+
         // Permissions by group
-        permissionsByGroup: matrix.permissions.reduce((acc, entry) => {
-          acc[entry.group] = (acc[entry.group] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>),
+        permissionsByGroup: matrix.permissions.reduce(
+          (acc, entry) => {
+            acc[entry.group] = (acc[entry.group] || 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>
+        ),
 
         // Plans overview
         plans: matrix.plans.map((plan) => ({
@@ -271,7 +277,7 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/plan/:slug
    * Get all permissions for a specific plan
-   * 
+   *
    * @access Admin
    */
   async getPlanPermissions(req: Request, res: Response): Promise<void> {
@@ -317,7 +323,7 @@ class PermissionMatrixController {
   /**
    * GET /v1/permissions/role/:role
    * Get all permissions for a specific role
-   * 
+   *
    * @access Admin
    */
   async getRolePermissions(req: Request, res: Response): Promise<void> {

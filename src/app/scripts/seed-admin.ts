@@ -29,7 +29,9 @@ async function seedAdmin() {
   const password = process.env.SEED_ADMIN_PASSWORD ?? '';
 
   if (!email || !email.includes('@')) {
-    logger.error('Usage: SEED_ADMIN_PASSWORD=... npm run seed:admin -- <admin e-mail>');
+    logger.error(
+      'Usage: SEED_ADMIN_PASSWORD=... npm run seed:admin -- <admin e-mail>'
+    );
     process.exit(1);
   }
   const strength = validatePassword(password);
@@ -52,7 +54,9 @@ async function seedAdmin() {
       existing.sessions = [];
       existing.image = undefined;
       await existing.save();
-      logger.info(`Promoted/updated admin user ${maskEmail(email)}; existing sessions revoked`);
+      logger.info(
+        `Promoted/updated admin user ${maskEmail(email)}; existing sessions revoked`
+      );
     } else {
       await User.create({
         email,

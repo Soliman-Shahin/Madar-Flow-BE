@@ -62,7 +62,11 @@ function localDateParts(value: Date, timezone: string): WallDate {
   }).formatToParts(value);
   const valueOf = (type: string) =>
     Number(parts.find((part) => part.type === type)?.value);
-  return { year: valueOf('year'), month: valueOf('month'), day: valueOf('day') };
+  return {
+    year: valueOf('year'),
+    month: valueOf('month'),
+    day: valueOf('day'),
+  };
 }
 
 function localDateTimeParts(value: Date, timezone: string) {
@@ -144,7 +148,7 @@ export function nextAnalyticsReportRunAt(
     };
     const matches =
       input.frequency === 'weekly'
-        ? ((date.getUTCDay() || 7) === input.weekday)
+        ? (date.getUTCDay() || 7) === input.weekday
         : candidateDate.day === input.monthDay;
     if (!matches) continue;
     const candidate = wallTimeToUtc(candidateDate, input.hour, input.timezone);
@@ -166,9 +170,15 @@ function isEligibleAdmin(user: any): boolean {
 function validateFrequency(input: AnalyticsReportScheduleInput): void {
   if (
     (input.frequency === 'weekly' &&
-      (!input.weekday || input.weekday < 1 || input.weekday > 7 || input.monthDay !== undefined)) ||
+      (!input.weekday ||
+        input.weekday < 1 ||
+        input.weekday > 7 ||
+        input.monthDay !== undefined)) ||
     (input.frequency === 'monthly' &&
-      (!input.monthDay || input.monthDay < 1 || input.monthDay > 28 || input.weekday !== undefined))
+      (!input.monthDay ||
+        input.monthDay < 1 ||
+        input.monthDay > 28 ||
+        input.weekday !== undefined))
   ) {
     throw new RangeError('Choose a valid weekly day or monthly date.');
   }
@@ -197,7 +207,11 @@ function publicSchedule(schedule: IAnalyticsReportSchedule) {
   };
 }
 
-function reportPeriod(days: 7 | 30 | 90, comparison: ReportComparison, now: Date) {
+function reportPeriod(
+  days: 7 | 30 | 90,
+  comparison: ReportComparison,
+  now: Date
+) {
   const end = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
   );
@@ -262,14 +276,16 @@ const scheduleLabels = {
 };
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (character) =>
-    ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;',
-    })[character] as string
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character] as string
   );
 }
 
@@ -291,7 +307,9 @@ function buildEmail(report: any, schedule: IAnalyticsReportSchedule) {
     schedule.language
   );
   const previousEnd = formatReportDate(
-    new Date(new Date(report.period.previousEndExclusive).getTime() - 1).toISOString(),
+    new Date(
+      new Date(report.period.previousEndExclusive).getTime() - 1
+    ).toISOString(),
     schedule.language
   );
   const comparison =
@@ -333,7 +351,10 @@ function buildEmail(report: any, schedule: IAnalyticsReportSchedule) {
 export class AnalyticsReportScheduleService {
   private readonly ownerLocks = new Map<string, Promise<void>>();
 
-  private async withOwnerLock<T>(ownerId: string, action: () => Promise<T>): Promise<T> {
+  private async withOwnerLock<T>(
+    ownerId: string,
+    action: () => Promise<T>
+  ): Promise<T> {
     const previous = this.ownerLocks.get(ownerId) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>((resolve) => (release = resolve));
@@ -343,7 +364,8 @@ export class AnalyticsReportScheduleService {
       return await action();
     } finally {
       release();
-      if (this.ownerLocks.get(ownerId) === current) this.ownerLocks.delete(ownerId);
+      if (this.ownerLocks.get(ownerId) === current)
+        this.ownerLocks.delete(ownerId);
     }
   }
 
@@ -387,7 +409,11 @@ export class AnalyticsReportScheduleService {
       );
   }
 
-  async create(ownerId: string, input: AnalyticsReportScheduleInput, now = new Date()) {
+  async create(
+    ownerId: string,
+    input: AnalyticsReportScheduleInput,
+    now = new Date()
+  ) {
     validateFrequency(input);
     return this.withOwnerLock(ownerId, async () => {
       await this.requireEligibleOwner(ownerId);
@@ -445,7 +471,12 @@ export class AnalyticsReportScheduleService {
     });
   }
 
-  async setActive(ownerId: string, id: string, active: boolean, now = new Date()) {
+  async setActive(
+    ownerId: string,
+    id: string,
+    active: boolean,
+    now = new Date()
+  ) {
     if (!Types.ObjectId.isValid(id))
       throw new AnalyticsReportScheduleError(
         'Report schedule not found.',
@@ -474,14 +505,17 @@ export class AnalyticsReportScheduleService {
       schedule.lastErrorCode = null;
       schedule.consecutiveFailures = 0;
       schedule.lastDeliveryStatus = active ? 'scheduled' : 'paused';
-      if (active)
-        schedule.nextRunAt = nextAnalyticsReportRunAt(schedule, now);
+      if (active) schedule.nextRunAt = nextAnalyticsReportRunAt(schedule, now);
       await schedule.save();
       return publicSchedule(schedule);
     });
   }
 
-  async cancel(ownerId: string, id: string, now = new Date()): Promise<boolean> {
+  async cancel(
+    ownerId: string,
+    id: string,
+    now = new Date()
+  ): Promise<boolean> {
     if (!Types.ObjectId.isValid(id)) return false;
     const result = await AnalyticsReportSchedule.updateOne(
       { _id: id, owner: ownerId, cancelledAt: null },
@@ -572,7 +606,9 @@ export class AnalyticsReportScheduleService {
       });
       const mail = buildEmail(report, schedule);
       const occurrence = schedule.nextRunAt.toISOString();
-      const occurrenceHash = createHash('sha256').update(occurrence).digest('hex');
+      const occurrenceHash = createHash('sha256')
+        .update(occurrence)
+        .digest('hex');
       const idempotencyKey = `analytics-report/${schedule._id.toString()}/${occurrenceHash}`;
 
       // A user may pause or cancel after the worker claims the lease.

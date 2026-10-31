@@ -31,12 +31,12 @@ export class CategoryService {
       notification: {
         title: 'Category Created',
         message: `A new category was created.`,
-        type: 'success'
+        type: 'success',
       },
       changes: data,
       targetUserId: userId,
       targetResourceType: 'Category',
-      targetResourceId: result._id.toString()
+      targetResourceId: result._id.toString(),
     });
 
     return result;
@@ -56,7 +56,11 @@ export class CategoryService {
     if (titlePattern) filter.title = { $regex: titlePattern, $options: 'i' };
     if (type) filter.type = type;
     const sortText: string = typeof sort === 'string' ? sort : 'order';
-    const sortField = safeSortField(sortText.startsWith('-') ? sortText.substring(1) : sortText, 'order', ['order','title','type','createdAt','updatedAt','isDefault']);
+    const sortField = safeSortField(
+      sortText.startsWith('-') ? sortText.substring(1) : sortText,
+      'order',
+      ['order', 'title', 'type', 'createdAt', 'updatedAt', 'isDefault']
+    );
     const sortOrder = sortText.startsWith('-') ? -1 : 1;
     const sortObj: Record<string, 1 | -1> = {
       [sortField]: sortOrder as 1 | -1,
@@ -67,7 +71,7 @@ export class CategoryService {
       .skip((page - 1) * limit)
       .limit(Number(limit));
     const total = await Category.countDocuments(filter);
-    
+
     const result = { data, total };
     cacheService.set(cacheKey, result, 300); // Cache for 5 minutes
     return result;
@@ -90,7 +94,12 @@ export class CategoryService {
     return category;
   }
 
-  static async updateCategory(id: string, data: any, userId: string, req?: Request) {
+  static async updateCategory(
+    id: string,
+    data: any,
+    userId: string,
+    req?: Request
+  ) {
     const category = await Category.findOne({ _id: id, user: userId });
     if (!category) return null;
 
@@ -116,12 +125,12 @@ export class CategoryService {
       notification: {
         title: 'Category Updated',
         message: `A category was updated.`,
-        type: 'info'
+        type: 'info',
       },
       changes: data,
       targetUserId: userId,
       targetResourceType: 'Category',
-      targetResourceId: id
+      targetResourceId: id,
     });
 
     return updated;
@@ -157,11 +166,11 @@ export class CategoryService {
       notification: {
         title: 'Category Deleted',
         message: `A category was deleted.`,
-        type: 'warn'
+        type: 'warn',
       },
       targetUserId: userId,
       targetResourceType: 'Category',
-      targetResourceId: id
+      targetResourceId: id,
     });
 
     return deleted;

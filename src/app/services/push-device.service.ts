@@ -1,5 +1,8 @@
 import { Types } from 'mongoose';
-import { DevicePushToken, PushPlatform } from '../models/device-push-token.model';
+import {
+  DevicePushToken,
+  PushPlatform,
+} from '../models/device-push-token.model';
 
 interface RegisterDeviceInput {
   userId: string;

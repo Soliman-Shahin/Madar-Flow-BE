@@ -65,27 +65,21 @@ export const requirePermission = (permission: Permission) => {
         logger.warn(
           `Permission denied: user=${planReq.user_id} plan=${planSlug} missing=${permission}`
         );
-        
+
         // Generate enhanced error message with upgrade suggestions
         const errorDetails = errorMessageService.getPermissionDeniedMessage({
           permission,
           currentPlan: planSlug,
         });
-        
-        return sendError(
-          res,
-          errorDetails.message,
-          403,
-          'PERMISSION_DENIED',
-          {
-            permission,
-            currentPlan: planSlug,
-            requiredPlan: errorDetails.requiredPlan,
-            suggestion: errorDetails.suggestion,
-            upgradeUrl: errorDetails.upgradeUrl,
-            learnMoreUrl: errorDetails.learnMoreUrl,
-          }
-        );
+
+        return sendError(res, errorDetails.message, 403, 'PERMISSION_DENIED', {
+          permission,
+          currentPlan: planSlug,
+          requiredPlan: errorDetails.requiredPlan,
+          suggestion: errorDetails.suggestion,
+          upgradeUrl: errorDetails.upgradeUrl,
+          learnMoreUrl: errorDetails.learnMoreUrl,
+        });
       }
 
       logger.debug(

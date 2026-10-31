@@ -15,7 +15,12 @@ export const verifySession = async (
     const _id = req.header('_id');
     // Reject malformed credentials up front so internal errors (hashing/cast) never reach the client.
     if (!refreshToken || !_id || !mongoose.isValidObjectId(_id)) {
-      return sendError(res, 'Missing or invalid session credentials', 401, 'SESSION_INVALID');
+      return sendError(
+        res,
+        'Missing or invalid session credentials',
+        401,
+        'SESSION_INVALID'
+      );
     }
     const user: UserDocument | null = await User.findByIdAndToken(
       _id,

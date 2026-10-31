@@ -214,7 +214,11 @@ const UserSchema = new Schema<UserDocument>(
         expiresAt: { type: Number, required: true },
         createdAt: { type: Date, default: Date.now },
         lastAuthenticatedAt: { type: Date, default: Date.now },
-        platform: { type: String, enum: ['web', 'android', 'ios'], default: 'web' },
+        platform: {
+          type: String,
+          enum: ['web', 'android', 'ios'],
+          default: 'web',
+        },
       },
     ],
     passwordResetTokenHash: { type: String, select: false },

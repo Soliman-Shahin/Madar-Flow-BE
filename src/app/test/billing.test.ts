@@ -45,13 +45,19 @@ async function seedPlans() {
 }
 
 async function newUser(email: string, role = UserRole.User) {
-  const user = await User.create({ email, password: 'unused-in-this-test', role });
+  const user = await User.create({
+    email,
+    password: 'unused-in-this-test',
+    role,
+  });
   await user.createSession();
   const fresh = (await User.findById(user._id))!;
   return { id: String(user._id), token: await fresh.generateAccessAuthToken() };
 }
 
-const event = (over: Partial<BillingEvent> & { userId: string }): BillingEvent => ({
+const event = (
+  over: Partial<BillingEvent> & { userId: string }
+): BillingEvent => ({
   provider: 'google_play',
   eventId: 'evt-1',
   planSlug: PlanSlug.Pro,
@@ -114,11 +120,15 @@ describe('Self-service upgrades are closed by default', () => {
     await seedPlans();
     const { token } = await newUser('me@example.test');
     delete process.env.ALLOW_SELF_SERVICE_UPGRADE;
-    const off = await request(app).get('/v1/plans/me').auth(token, { type: 'bearer' });
+    const off = await request(app)
+      .get('/v1/plans/me')
+      .auth(token, { type: 'bearer' });
     expect(off.status).toBe(200);
     expect(off.body.data.upgradeAvailable).toBe(false);
     process.env.ALLOW_SELF_SERVICE_UPGRADE = 'true';
-    const on = await request(app).get('/v1/plans/me').auth(token, { type: 'bearer' });
+    const on = await request(app)
+      .get('/v1/plans/me')
+      .auth(token, { type: 'bearer' });
     expect(on.body.data.upgradeAvailable).toBe(true);
   });
 });
@@ -136,7 +146,11 @@ describe('BillingService (verified provider events -> plan state)', () => {
     expect(user!.planExpiresAt!.getTime()).toBe(T0.getTime() + 30 * DAY);
     const subs = await Subscription.find({ user: id });
     expect(subs).toHaveLength(1);
-    expect(subs[0]).toMatchObject({ status: 'active', paymentMethod: 'google_play', paymentRef: 'evt-1' });
+    expect(subs[0]).toMatchObject({
+      status: 'active',
+      paymentMethod: 'google_play',
+      paymentRef: 'evt-1',
+    });
   });
 
   it('replays are harmless (same event twice applies once)', async () => {
@@ -165,7 +179,9 @@ describe('BillingService (verified provider events -> plan state)', () => {
     const subs = await Subscription.find({ user: id });
     expect(subs).toHaveLength(1);
     expect(subs[0].endDate!.getTime()).toBe(later.getTime() + 30 * DAY);
-    expect((await User.findById(id))!.planExpiresAt!.getTime()).toBe(later.getTime() + 30 * DAY);
+    expect((await User.findById(id))!.planExpiresAt!.getTime()).toBe(
+      later.getTime() + 30 * DAY
+    );
   });
 
   it('cancelling keeps access until the paid period ends, then expiry downgrades', async () => {
@@ -173,13 +189,33 @@ describe('BillingService (verified provider events -> plan state)', () => {
     await billingService.applyEvent(event({ userId: id }), T0);
 
     const t1 = new Date(T0.getTime() + 5 * DAY);
-    await billingService.applyEvent(event({ userId: id, eventId: 'evt-c', type: 'cancelled', occurredAt: t1, periodEnd: null }), t1);
+    await billingService.applyEvent(
+      event({
+        userId: id,
+        eventId: 'evt-c',
+        type: 'cancelled',
+        occurredAt: t1,
+        periodEnd: null,
+      }),
+      t1
+    );
     let user = await User.findById(id);
     expect(user!.plan).toBe(PlanSlug.Pro); // still paid up
-    expect((await Subscription.findOne({ user: id }))!.status).toBe('cancelled');
+    expect((await Subscription.findOne({ user: id }))!.status).toBe(
+      'cancelled'
+    );
 
     const t2 = new Date(T0.getTime() + 31 * DAY);
-    const res = await billingService.applyEvent(event({ userId: id, eventId: 'evt-e', type: 'expired', occurredAt: t2, periodEnd: null }), t2);
+    const res = await billingService.applyEvent(
+      event({
+        userId: id,
+        eventId: 'evt-e',
+        type: 'expired',
+        occurredAt: t2,
+        periodEnd: null,
+      }),
+      t2
+    );
     expect(res).toEqual({ applied: true });
     user = await User.findById(id);
     expect(user!.plan).toBe(PlanSlug.Free);
@@ -191,19 +227,45 @@ describe('BillingService (verified provider events -> plan state)', () => {
     const { id } = await newUser('refund@example.test');
     await billingService.applyEvent(event({ userId: id }), T0);
     const t1 = new Date(T0.getTime() + DAY);
-    await billingService.applyEvent(event({ userId: id, eventId: 'evt-r', type: 'refunded', occurredAt: t1, periodEnd: null }), t1);
+    await billingService.applyEvent(
+      event({
+        userId: id,
+        eventId: 'evt-r',
+        type: 'refunded',
+        occurredAt: t1,
+        periodEnd: null,
+      }),
+      t1
+    );
     expect((await User.findById(id))!.plan).toBe(PlanSlug.Free);
-    expect((await Subscription.findOne({ user: id }))!.status).toBe('cancelled');
+    expect((await Subscription.findOne({ user: id }))!.status).toBe(
+      'cancelled'
+    );
   });
 
   it('ignores an older event that arrives after a newer one', async () => {
     const { id } = await newUser('order@example.test');
     const t2 = new Date(T0.getTime() + 31 * DAY);
     await billingService.applyEvent(event({ userId: id }), T0);
-    await billingService.applyEvent(event({ userId: id, eventId: 'evt-e', type: 'expired', occurredAt: t2, periodEnd: null }), t2);
+    await billingService.applyEvent(
+      event({
+        userId: id,
+        eventId: 'evt-e',
+        type: 'expired',
+        occurredAt: t2,
+        periodEnd: null,
+      }),
+      t2
+    );
     // A delayed "renewed" from before the expiry must not resurrect the plan.
     const stale = await billingService.applyEvent(
-      event({ userId: id, eventId: 'evt-old', type: 'renewed', occurredAt: new Date(T0.getTime() + 10 * DAY), periodEnd: new Date(t2.getTime() + 30 * DAY) }),
+      event({
+        userId: id,
+        eventId: 'evt-old',
+        type: 'renewed',
+        occurredAt: new Date(T0.getTime() + 10 * DAY),
+        periodEnd: new Date(t2.getTime() + 30 * DAY),
+      }),
       t2
     );
     expect(stale).toEqual({ applied: false, reason: 'stale' });
@@ -213,7 +275,10 @@ describe('BillingService (verified provider events -> plan state)', () => {
   it('never downgrades a plan that an admin granted (not managed by the provider)', async () => {
     const { id } = await newUser('manual@example.test');
     await User.updateOne({ _id: id }, { $set: { plan: PlanSlug.Pro } });
-    const res = await billingService.applyEvent(event({ userId: id, eventId: 'evt-x', type: 'expired', periodEnd: null }), T0);
+    const res = await billingService.applyEvent(
+      event({ userId: id, eventId: 'evt-x', type: 'expired', periodEnd: null }),
+      T0
+    );
     expect(res).toEqual({ applied: false, reason: 'not_managed' });
     expect((await User.findById(id))!.plan).toBe(PlanSlug.Pro);
   });
@@ -221,13 +286,26 @@ describe('BillingService (verified provider events -> plan state)', () => {
   it('rejects purchases that make no sense', async () => {
     const { id } = await newUser('bad@example.test');
     await expect(
-      billingService.applyEvent(event({ userId: id, planSlug: PlanSlug.Free }), T0)
+      billingService.applyEvent(
+        event({ userId: id, planSlug: PlanSlug.Free }),
+        T0
+      )
     ).rejects.toThrow();
     await expect(
-      billingService.applyEvent(event({ userId: id, eventId: 'p', periodEnd: new Date(T0.getTime() - DAY) }), T0)
+      billingService.applyEvent(
+        event({
+          userId: id,
+          eventId: 'p',
+          periodEnd: new Date(T0.getTime() - DAY),
+        }),
+        T0
+      )
     ).rejects.toThrow();
     await expect(
-      billingService.applyEvent(event({ userId: id, eventId: 'q', periodEnd: null }), T0)
+      billingService.applyEvent(
+        event({ userId: id, eventId: 'q', periodEnd: null }),
+        T0
+      )
     ).rejects.toThrow();
     expect(await BillingEventLog.countDocuments()).toBe(0);
     expect((await User.findById(id))!.plan).toBe(PlanSlug.Free);
@@ -236,10 +314,14 @@ describe('BillingService (verified provider events -> plan state)', () => {
   it('does not leave an event recorded when applying it fails (so a retry can succeed)', async () => {
     const { id } = await newUser('retry@example.test');
     await Plan.deleteOne({ slug: PlanSlug.Pro }); // makes the grant fail
-    await expect(billingService.applyEvent(event({ userId: id }), T0)).rejects.toThrow();
+    await expect(
+      billingService.applyEvent(event({ userId: id }), T0)
+    ).rejects.toThrow();
     expect(await BillingEventLog.countDocuments()).toBe(0);
     await seedPlansOnly(PlanSlug.Pro);
-    expect(await billingService.applyEvent(event({ userId: id }), T0)).toEqual({ applied: true });
+    expect(await billingService.applyEvent(event({ userId: id }), T0)).toEqual({
+      applied: true,
+    });
   });
 });
 
@@ -251,7 +333,12 @@ async function seedPlansOnly(slug: PlanSlug) {
     price: 4.99,
     currency: 'USD',
     billingCycle: 'monthly',
-    limits: { maxCategories: 20, maxTransactionsPerMonth: 500, maxBackupFiles: 10, maxDevices: 3 },
+    limits: {
+      maxCategories: 20,
+      maxTransactionsPerMonth: 500,
+      maxBackupFiles: 10,
+      maxDevices: 3,
+    },
     features: [],
     isActive: true,
     isPopular: false,

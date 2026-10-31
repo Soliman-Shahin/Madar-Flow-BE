@@ -15,7 +15,7 @@ import logger from './logger.service';
 
 /**
  * Scope Service
- * 
+ *
  * Provides utility functions for working with permission scopes.
  * Scopes are logical groupings of permissions for easier management.
  */
@@ -25,7 +25,8 @@ class ScopeService {
    */
   async userHasScope(userId: string, scope: PermissionScope): Promise<boolean> {
     try {
-      const permissions = await permissionCacheService.getUserPermissions(userId);
+      const permissions =
+        await permissionCacheService.getUserPermissions(userId);
       return hasScope(permissions, scope);
     } catch (error: any) {
       logger.error(`Error checking user scope: ${error.message}`);
@@ -41,7 +42,8 @@ class ScopeService {
     scopes: PermissionScope[]
   ): Promise<boolean> {
     try {
-      const permissions = await permissionCacheService.getUserPermissions(userId);
+      const permissions =
+        await permissionCacheService.getUserPermissions(userId);
       return hasAnyScope(permissions, scopes);
     } catch (error: any) {
       logger.error(`Error checking user scopes: ${error.message}`);
@@ -57,7 +59,8 @@ class ScopeService {
     scopes: PermissionScope[]
   ): Promise<boolean> {
     try {
-      const permissions = await permissionCacheService.getUserPermissions(userId);
+      const permissions =
+        await permissionCacheService.getUserPermissions(userId);
       return hasAllScopes(permissions, scopes);
     } catch (error: any) {
       logger.error(`Error checking user scopes: ${error.message}`);
@@ -70,7 +73,8 @@ class ScopeService {
    */
   async getUserScopes(userId: string): Promise<PermissionScope[]> {
     try {
-      const permissions = await permissionCacheService.getUserPermissions(userId);
+      const permissions =
+        await permissionCacheService.getUserPermissions(userId);
       return getUserScopes(permissions);
     } catch (error: any) {
       logger.error(`Error getting user scopes: ${error.message}`);
@@ -86,7 +90,8 @@ class ScopeService {
     requiredScopes: PermissionScope[]
   ): Promise<PermissionScope[]> {
     try {
-      const permissions = await permissionCacheService.getUserPermissions(userId);
+      const permissions =
+        await permissionCacheService.getUserPermissions(userId);
       return requiredScopes.filter((scope) => !hasScope(permissions, scope));
     } catch (error: any) {
       logger.error(`Error getting missing scopes: ${error.message}`);
@@ -157,9 +162,13 @@ class ScopeService {
   /**
    * Get scopes by category
    */
-  getScopesByCategory(category: 'resource' | 'admin' | 'feature'): PermissionScope[] {
+  getScopesByCategory(
+    category: 'resource' | 'admin' | 'feature'
+  ): PermissionScope[] {
     const allScopes = this.getAllScopes();
-    return allScopes.filter((scope) => this.getScopeCategory(scope) === category);
+    return allScopes.filter(
+      (scope) => this.getScopeCategory(scope) === category
+    );
   }
 
   /**

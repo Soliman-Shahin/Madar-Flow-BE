@@ -14,7 +14,10 @@ import {
   checkPlanLimit,
 } from '../middleware/plan.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
-import { requireOwnership, canAccessResource } from '../middleware/resource-ownership.middleware';
+import {
+  requireOwnership,
+  canAccessResource,
+} from '../middleware/resource-ownership.middleware';
 import { Permission } from '../types/permissions.types';
 import { expenseSchema } from '../validations/expense.validation';
 

@@ -67,21 +67,28 @@ describe('subscription expiry reminder processor', () => {
   it.each([
     ['window start', 7 * DAY_MS, true],
     ['one millisecond before window start', 7 * DAY_MS - 1, false],
-    ['one millisecond before window end', 7 * DAY_MS + 60 * 60 * 1000 - 1, true],
+    [
+      'one millisecond before window end',
+      7 * DAY_MS + 60 * 60 * 1000 - 1,
+      true,
+    ],
     ['window end', 7 * DAY_MS + 60 * 60 * 1000, false],
     ['already expired before reference', -1, false],
-  ])('applies the UTC instant half-open boundary for %s', async (_label, offset, included) => {
-    const expiry = new Date(reference.getTime() + Number(offset));
-    await user(`${String(_label).replace(/ /g, '-')}@example.test`, expiry);
+  ])(
+    'applies the UTC instant half-open boundary for %s',
+    async (_label, offset, included) => {
+      const expiry = new Date(reference.getTime() + Number(offset));
+      await user(`${String(_label).replace(/ /g, '-')}@example.test`, expiry);
 
-    const result =
-      await SubscriptionExpiryReminderService.processExpiringSubscriptions(
-        reference
-      );
+      const result =
+        await SubscriptionExpiryReminderService.processExpiringSubscriptions(
+          reference
+        );
 
-    expect(result.eligible).toBe(included ? 1 : 0);
-    expect(dispatch).toHaveBeenCalledTimes(included ? 1 : 0);
-  });
+      expect(result.eligible).toBe(included ? 1 : 0);
+      expect(dispatch).toHaveBeenCalledTimes(included ? 1 : 0);
+    }
+  );
 
   it('emits one reminder inside the seven-day window with approved metadata only', async () => {
     const expiry = new Date(reference.getTime() + 7 * DAY_MS + 30 * 60 * 1000);
@@ -268,36 +275,53 @@ describe('subscription expiry reminder processor', () => {
     initializeSocketService(httpServer);
     const push = jest
       .spyOn(PushDeliveryService, 'sendToUsers')
-      .mockResolvedValue({ attempted: 0, succeeded: 0, failed: 0, invalidTokens: 0 });
+      .mockResolvedValue({
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        invalidTokens: 0,
+      });
 
     await plan(PlanSlug.Premium);
     const firstExpiry = new Date(reference.getTime() + 7 * DAY_MS + 1);
     const account = await user('renewal@example.test', firstExpiry);
 
     try {
-      await SubscriptionExpiryReminderService.processExpiringSubscriptions(reference);
+      await SubscriptionExpiryReminderService.processExpiringSubscriptions(
+        reference
+      );
 
       const renewedExpiry = new Date(reference.getTime() + 8 * DAY_MS + 1);
       await User.updateOne(
         { _id: account._id },
         { $set: { planExpiresAt: renewedExpiry } }
       );
-      const renewedReference = new Date(renewedExpiry.getTime() - 7 * DAY_MS - 1);
-      await SubscriptionExpiryReminderService.processExpiringSubscriptions(renewedReference);
+      const renewedReference = new Date(
+        renewedExpiry.getTime() - 7 * DAY_MS - 1
+      );
+      await SubscriptionExpiryReminderService.processExpiringSubscriptions(
+        renewedReference
+      );
 
       await User.updateOne(
         { _id: account._id },
         { $set: { plan: PlanSlug.Premium } }
       );
-      await SubscriptionExpiryReminderService.processExpiringSubscriptions(renewedReference);
+      await SubscriptionExpiryReminderService.processExpiringSubscriptions(
+        renewedReference
+      );
 
-      const reminders = await Notification.find({ event: 'subscription.expiring' })
+      const reminders = await Notification.find({
+        event: 'subscription.expiring',
+      })
         .sort({ createdAt: 1 })
         .lean();
       expect(reminders).toHaveLength(2);
       expect(reminders[0].dedupeKey).not.toBe(reminders[1].dedupeKey);
       expect(reminders[0].metadata?.expiresAt).toBe(firstExpiry.toISOString());
-      expect(reminders[1].metadata?.expiresAt).toBe(renewedExpiry.toISOString());
+      expect(reminders[1].metadata?.expiresAt).toBe(
+        renewedExpiry.toISOString()
+      );
     } finally {
       httpServer.close();
       push.mockRestore();

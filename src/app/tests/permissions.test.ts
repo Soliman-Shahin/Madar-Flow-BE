@@ -131,7 +131,9 @@ describe('Permission System Tests', () => {
     it('should grant all features to premium users', () => {
       const premiumUser = createMockUserWithPlan(PlanSlug.Premium);
       expect(premiumUser.permissions).toContain(Permission.EXPENSE_EXPORT);
-      expect(premiumUser.permissions).toContain(Permission.SECURITY_ADVANCED_ENCRYPTION);
+      expect(premiumUser.permissions).toContain(
+        Permission.SECURITY_ADVANCED_ENCRYPTION
+      );
       expect(premiumUser.permissions).toContain(Permission.SYNC_MULTI_DEVICE);
     });
   });

@@ -17,7 +17,9 @@ async function createFixture() {
   });
   // Access tokens are bound to a persisted session (sid), so create one first.
   await user.createSession();
-  const token = await (await User.findById(user._id))!.generateAccessAuthToken();
+  const token = await (await User.findById(
+    user._id
+  ))!.generateAccessAuthToken();
   const category = await Category.create({
     user: user._id,
     _clientId: `sync-http-category-${Date.now()}`,
@@ -76,7 +78,11 @@ describe('sync conflict resolution HTTP boundary', () => {
     expect(resolved.status).toBe(200);
     expect(resolved.body.data.entity.amount).toBe(200);
     expect(resolved.body.data.entity._version).toBe(3);
-    expect(await ConflictResolution.countDocuments({ conflictId: conflict.conflictId })).toBe(1);
+    expect(
+      await ConflictResolution.countDocuments({
+        conflictId: conflict.conflictId,
+      })
+    ).toBe(1);
   });
 
   it('creates a real conflict then resolves Use Server without advancing revision', async () => {
@@ -196,7 +202,11 @@ describe('sync conflict resolution HTTP boundary', () => {
     const res = await request(app)
       .post('/v1/sync/conflicts/resolve')
       .set('Authorization', `Bearer ${token}`)
-      .send({ entityId: String(expense._id), entityType: 'expense', resolution: 'server' });
+      .send({
+        entityId: String(expense._id),
+        entityType: 'expense',
+        resolution: 'server',
+      });
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('SYNC_CONFLICT_NOT_FOUND');
   });

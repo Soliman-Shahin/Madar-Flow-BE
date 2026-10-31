@@ -26,9 +26,12 @@ const consent = {
 
 let ipCounter = 0;
 // A distinct client IP per call keeps the in-memory brute-force/rate-limit state isolated.
-const freshIp = () => `10.20.${Math.floor(++ipCounter / 250)}.${(ipCounter % 250) + 1}`;
+const freshIp = () =>
+  `10.20.${Math.floor(++ipCounter / 250)}.${(ipCounter % 250) + 1}`;
 
-const encrypted = (body: Record<string, unknown>) => ({ data: encryptCryptoJS(body) });
+const encrypted = (body: Record<string, unknown>) => ({
+  data: encryptCryptoJS(body),
+});
 
 async function signUp(email: string) {
   const res = await request(app)
@@ -36,11 +39,15 @@ async function signUp(email: string) {
     .set('X-Forwarded-For', freshIp())
     .send(encrypted({ email, password: PASSWORD, ...consent }));
   expect(res.status).toBe(200);
-  return { token: res.body.data.accessToken as string, id: res.body.data.user._id as string };
+  return {
+    token: res.body.data.accessToken as string,
+    id: res.body.data.user._id as string,
+  };
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
-const get = (path: string, token: string) => request(app).get(path).set(auth(token));
+const get = (path: string, token: string) =>
+  request(app).get(path).set(auth(token));
 const post = (path: string, token: string, body: object) =>
   request(app).post(path).set(auth(token)).send(body);
 const put = (path: string, token: string, body: object) =>
@@ -57,7 +64,9 @@ describe('E2E: account and sign-in', () => {
     const me = await get('/v1/plans/me', token);
     expect(me.status).toBe(200);
     expect(me.body.data.context.planSlug).toBe('free');
-    expect(await Category.countDocuments({ user: id, isDefault: true })).toBe(1);
+    expect(await Category.countDocuments({ user: id, isDefault: true })).toBe(
+      1
+    );
 
     const login = await request(app)
       .post('/v1/user/login')
@@ -69,7 +78,12 @@ describe('E2E: account and sign-in', () => {
     const wrong = await request(app)
       .post('/v1/user/login')
       .set('X-Forwarded-For', freshIp())
-      .send(encrypted({ email: 'first-day@example.test', password: 'Wrong-Password-1!' }));
+      .send(
+        encrypted({
+          email: 'first-day@example.test',
+          password: 'Wrong-Password-1!',
+        })
+      );
     expect(wrong.status).toBe(401);
     expect(wrong.body.data?.accessToken).toBeUndefined();
   });
@@ -79,7 +93,9 @@ describe('E2E: account and sign-in', () => {
     const again = await request(app)
       .post('/v1/user/signup')
       .set('X-Forwarded-For', freshIp())
-      .send(encrypted({ email: 'dup@example.test', password: PASSWORD, ...consent }));
+      .send(
+        encrypted({ email: 'dup@example.test', password: PASSWORD, ...consent })
+      );
     expect(again.status).toBe(409);
     expect(await User.countDocuments({ email: 'dup@example.test' })).toBe(1);
 
@@ -178,7 +194,9 @@ describe('E2E: offline-first sync between two devices', () => {
     // Device B (same account) starts from scratch and sees both records.
     const pullB = await get('/v1/sync/pull', token);
     expect(pullB.status).toBe(200);
-    const types = pullB.body.data.entities.map((e: { _entityType: string }) => e._entityType);
+    const types = pullB.body.data.entities.map(
+      (e: { _entityType: string }) => e._entityType
+    );
     expect(types).toEqual(expect.arrayContaining(['category', 'expense']));
     const taxi = pullB.body.data.entities.find(
       (e: { description?: string }) => e.description === 'Taxi'
@@ -203,8 +221,13 @@ describe('E2E: offline-first sync between two devices', () => {
     });
     expect(edit.status).toBe(200);
     expect(edit.body.data.errors).toHaveLength(0);
-    const after = await get(`/v1/sync/pull?lastSyncTime=${encodeURIComponent(checkpoint)}`, token);
-    const updated = after.body.data.entities.find((e: { _id: string }) => e._id === serverExpenseId);
+    const after = await get(
+      `/v1/sync/pull?lastSyncTime=${encodeURIComponent(checkpoint)}`,
+      token
+    );
+    const updated = after.body.data.entities.find(
+      (e: { _id: string }) => e._id === serverExpenseId
+    );
     expect(updated.amount).toBe(150);
 
     // Deleting on A is reported to B as a deletion, and the row is soft-deleted.
@@ -230,8 +253,25 @@ describe('E2E: offline-first sync between two devices', () => {
     const expLocal = 'offline_expense_conflict';
     const created = await post('/v1/sync/push', token, {
       entities: [
-        { _id: catLocal, _clientId: catLocal, _entityType: 'category', title: 'C', icon: 'tag-outline', color: '#3366ff', type: 'outcome', order: 0 },
-        { _id: expLocal, _clientId: expLocal, _entityType: 'expense', description: 'Original', amount: 10, category: catLocal, date: new Date().toISOString() },
+        {
+          _id: catLocal,
+          _clientId: catLocal,
+          _entityType: 'category',
+          title: 'C',
+          icon: 'tag-outline',
+          color: '#3366ff',
+          type: 'outcome',
+          order: 0,
+        },
+        {
+          _id: expLocal,
+          _clientId: expLocal,
+          _entityType: 'expense',
+          description: 'Original',
+          amount: 10,
+          category: catLocal,
+          date: new Date().toISOString(),
+        },
       ],
     });
     const id = created.body.data.idMap[expLocal];
@@ -239,16 +279,40 @@ describe('E2E: offline-first sync between two devices', () => {
 
     // Device A saves first.
     await post('/v1/sync/push', token, {
-      entities: [{ _id: id, _entityType: 'expense', _baseVersion: base, description: 'From A', amount: 20, category: (await Expense.findById(id))!.category, date: new Date().toISOString(), _operationId: 'conflict-a' }],
+      entities: [
+        {
+          _id: id,
+          _entityType: 'expense',
+          _baseVersion: base,
+          description: 'From A',
+          amount: 20,
+          category: (await Expense.findById(id))!.category,
+          date: new Date().toISOString(),
+          _operationId: 'conflict-a',
+        },
+      ],
     });
     // Device B still holds the old version and saves a different value.
     const stale = await post('/v1/sync/push', token, {
-      entities: [{ _id: id, _entityType: 'expense', _baseVersion: base, description: 'From B', amount: 30, category: (await Expense.findById(id))!.category, date: new Date().toISOString(), _operationId: 'conflict-b' }],
+      entities: [
+        {
+          _id: id,
+          _entityType: 'expense',
+          _baseVersion: base,
+          description: 'From B',
+          amount: 30,
+          category: (await Expense.findById(id))!.category,
+          date: new Date().toISOString(),
+          _operationId: 'conflict-b',
+        },
+      ],
     });
     expect(stale.status).toBe(200);
     const saved = await Expense.findById(id);
     expect(saved!.description).not.toBe('From B');
-    const reported = (stale.body.data.conflicts ?? []).length + (stale.body.data.errors ?? []).length;
+    const reported =
+      (stale.body.data.conflicts ?? []).length +
+      (stale.body.data.errors ?? []).length;
     expect(reported).toBeGreaterThan(0);
   });
 });
@@ -259,27 +323,46 @@ describe('E2E: account isolation', () => {
     const b = await signUp('stranger@example.test');
 
     const cat = await post('/v1/categories/create', a.token, {
-      title: 'Private', icon: 'lock-closed-outline', color: '#E5484D', type: 'outcome',
+      title: 'Private',
+      icon: 'lock-closed-outline',
+      color: '#E5484D',
+      type: 'outcome',
     });
     const categoryId = cat.body.data._id ?? cat.body.data.category?._id;
     const exp = await post('/v1/expenses', a.token, {
-      description: 'Secret purchase', amount: 999, category: categoryId, date: new Date().toISOString(),
+      description: 'Secret purchase',
+      amount: 999,
+      category: categoryId,
+      date: new Date().toISOString(),
     });
     const expenseId = exp.body.data._id ?? exp.body.data.expense?._id;
     expect(expenseId).toBeTruthy();
 
-    expect(JSON.stringify((await get('/v1/expenses', b.token)).body)).not.toContain('Secret purchase');
-    expect(JSON.stringify((await get('/v1/sync/pull', b.token)).body)).not.toContain('Secret purchase');
+    expect(
+      JSON.stringify((await get('/v1/expenses', b.token)).body)
+    ).not.toContain('Secret purchase');
+    expect(
+      JSON.stringify((await get('/v1/sync/pull', b.token)).body)
+    ).not.toContain('Secret purchase');
 
     const tamper = await put(`/v1/expenses/${expenseId}`, b.token, {
-      description: 'Hacked', amount: 1, category: categoryId, date: new Date().toISOString(),
+      description: 'Hacked',
+      amount: 1,
+      category: categoryId,
+      date: new Date().toISOString(),
     });
     expect(tamper.status).toBeGreaterThanOrEqual(400);
-    expect((await Expense.findById(expenseId))!.description).toBe('Secret purchase');
+    expect((await Expense.findById(expenseId))!.description).toBe(
+      'Secret purchase'
+    );
 
-    const del = await request(app).delete(`/v1/expenses/${expenseId}`).set(auth(b.token));
+    const del = await request(app)
+      .delete(`/v1/expenses/${expenseId}`)
+      .set(auth(b.token));
     expect(del.status).toBeGreaterThanOrEqual(400);
-    expect(await Expense.exists({ _id: expenseId, _isDeleted: { $ne: true } })).toBeTruthy();
+    expect(
+      await Expense.exists({ _id: expenseId, _isDeleted: { $ne: true } })
+    ).toBeTruthy();
   });
 });
 
@@ -293,7 +376,10 @@ describe('E2E: plan limits', () => {
     let blocked: number | null = null;
     for (let i = 0; i < max + 2; i++) {
       const res = await post('/v1/categories/create', token, {
-        title: `Cat ${i}`, icon: 'tag-outline', color: '#3366ff', type: 'outcome',
+        title: `Cat ${i}`,
+        icon: 'tag-outline',
+        color: '#3366ff',
+        type: 'outcome',
       });
       if (res.status >= 400) {
         blocked = res.status;
@@ -301,7 +387,9 @@ describe('E2E: plan limits', () => {
       }
     }
     expect(blocked).toBe(403);
-    expect(await Category.countDocuments({ user: id, _isDeleted: { $ne: true } })).toBe(max);
+    expect(
+      await Category.countDocuments({ user: id, _isDeleted: { $ne: true } })
+    ).toBe(max);
   });
   it('reports real usage and stops a free account at its monthly transaction limit', async () => {
     const { token, id } = await signUp('tx-limit@example.test');
@@ -313,7 +401,10 @@ describe('E2E: plan limits', () => {
     let blocked: number | null = null;
     for (let i = 0; i < max + 2; i++) {
       const res = await post('/v1/expenses', token, {
-        description: 'Item ' + i, amount: 1, category: categoryId, date: new Date().toISOString(),
+        description: 'Item ' + i,
+        amount: 1,
+        category: categoryId,
+        date: new Date().toISOString(),
       });
       if (res.status >= 400) {
         blocked = res.status;
@@ -334,12 +425,17 @@ describe('E2E: sync rate limit is per user', () => {
   it('one busy user hitting the limit does not block other users', async () => {
     const limited = express();
     limited.use((req, _res, next) => {
-      (req as unknown as { user_id: string }).user_id = String(req.headers['x-user']);
+      (req as unknown as { user_id: string }).user_id = String(
+        req.headers['x-user']
+      );
       next();
     });
-    limited.use('/v1/sync', rateLimitSync(2, 60_000), (_req, res) => res.json({ ok: true }));
+    limited.use('/v1/sync', rateLimitSync(2, 60_000), (_req, res) =>
+      res.json({ ok: true })
+    );
 
-    const hit = (user: string) => request(limited).get('/v1/sync/pull').set('x-user', user);
+    const hit = (user: string) =>
+      request(limited).get('/v1/sync/pull').set('x-user', user);
     expect((await hit('busy')).status).toBe(200);
     expect((await hit('busy')).status).toBe(200);
     expect((await hit('busy')).status).toBe(429);

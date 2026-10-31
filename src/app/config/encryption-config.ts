@@ -7,10 +7,17 @@ export function validateEncryptionKey(key: unknown): string {
   }
   const normalized = key.trim();
   if (normalized.length < MIN_ENCRYPTION_KEY_LENGTH) {
-    throw new Error(`ENCRYPTION_KEY must contain at least ${MIN_ENCRYPTION_KEY_LENGTH} characters for production.`);
+    throw new Error(
+      `ENCRYPTION_KEY must contain at least ${MIN_ENCRYPTION_KEY_LENGTH} characters for production.`
+    );
   }
-  if (/^(.)\1+$/.test(normalized) || /^(change[-_ ]?me|your[-_ ]|placeholder)/i.test(normalized)) {
-    throw new Error('ENCRYPTION_KEY must not use a placeholder or trivial value.');
+  if (
+    /^(.)\1+$/.test(normalized) ||
+    /^(change[-_ ]?me|your[-_ ]|placeholder)/i.test(normalized)
+  ) {
+    throw new Error(
+      'ENCRYPTION_KEY must not use a placeholder or trivial value.'
+    );
   }
   return normalized;
 }

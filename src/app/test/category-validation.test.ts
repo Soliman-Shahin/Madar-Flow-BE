@@ -16,8 +16,12 @@ async function token(email: string) {
     .set('X-Forwarded-For', freshIp())
     .send({
       data: encryptCryptoJS({
-        email, password: PASSWORD, termsAccepted: true, privacyAccepted: true,
-        termsVersion: CONSENT_VERSIONS.terms, privacyVersion: CONSENT_VERSIONS.privacy,
+        email,
+        password: PASSWORD,
+        termsAccepted: true,
+        privacyAccepted: true,
+        termsVersion: CONSENT_VERSIONS.terms,
+        privacyVersion: CONSENT_VERSIONS.privacy,
       }),
     });
   expect(res.status).toBe(200);
@@ -25,28 +29,48 @@ async function token(email: string) {
 }
 
 const create = (t: string, body: object) =>
-  request(app).post('/v1/categories/create').set({ Authorization: `Bearer ${t}` }).send(body);
+  request(app)
+    .post('/v1/categories/create')
+    .set({ Authorization: `Bearer ${t}` })
+    .send(body);
 
-beforeEach(async () => { await planService.seedDefaultPlans(); });
+beforeEach(async () => {
+  await planService.seedDefaultPlans();
+});
 
 describe('Category input validation', () => {
   it('rejects an empty title with 400 VALIDATION_ERROR (not a 500 leaking Mongoose text)', async () => {
     const t = await token('cat-val-1@example.test');
-    const res = await create(t, { title: '', icon: 'x', color: '#000000', type: 'outcome' });
+    const res = await create(t, {
+      title: '',
+      icon: 'x',
+      color: '#000000',
+      type: 'outcome',
+    });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(JSON.stringify(res.body)).not.toMatch(/Path `title`|validation failed:/i);
+    expect(JSON.stringify(res.body)).not.toMatch(
+      /Path `title`|validation failed:/i
+    );
   });
 
   it('rejects missing fields and an unknown type', async () => {
     const t = await token('cat-val-2@example.test');
     expect((await create(t, { title: 'Only title' })).status).toBe(400);
-    expect((await create(t, { title: 'T', icon: 'i', color: '#fff', type: 'weird' })).status).toBe(400);
+    expect(
+      (await create(t, { title: 'T', icon: 'i', color: '#fff', type: 'weird' }))
+        .status
+    ).toBe(400);
   });
 
   it('still accepts a valid category', async () => {
     const t = await token('cat-val-3@example.test');
-    const res = await create(t, { title: 'Valid', icon: 'cart-outline', color: '#3366CC', type: 'outcome' });
+    const res = await create(t, {
+      title: 'Valid',
+      icon: 'cart-outline',
+      color: '#3366CC',
+      type: 'outcome',
+    });
     expect(res.status).toBe(201);
     expect(res.body.data.title).toBe('Valid');
   });

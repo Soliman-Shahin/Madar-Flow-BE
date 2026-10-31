@@ -202,8 +202,12 @@ describe('sync conflict resolution lifecycle', () => {
       });
       expect(result.entity._version).toBe(3);
       expect((await Expense.findById(expense._id))?._version).toBe(3);
-      expect(await ConflictResolution.countDocuments({ conflictId: conflict._id })).toBe(1);
-      expect((await SyncConflict.findById(conflict._id))?.resolvedAt).toEqual(expect.any(Date));
+      expect(
+        await ConflictResolution.countDocuments({ conflictId: conflict._id })
+      ).toBe(1);
+      expect((await SyncConflict.findById(conflict._id))?.resolvedAt).toEqual(
+        expect.any(Date)
+      );
     }
   );
 
@@ -211,7 +215,13 @@ describe('sync conflict resolution lifecycle', () => {
     const { expense, conflict } = await seedConflict();
     await SyncConflict.updateOne(
       { _id: conflict._id },
-      { $set: { resolutionState: 'resolving', claimedResolution: 'server', appliedRevision: 2 } }
+      {
+        $set: {
+          resolutionState: 'resolving',
+          claimedResolution: 'server',
+          appliedRevision: 2,
+        },
+      }
     );
     const result = await new SyncService().resolveConflict(userA, {
       conflictId: conflict._id.toString(),
@@ -221,18 +231,32 @@ describe('sync conflict resolution lifecycle', () => {
     });
     expect(result.entity._version).toBe(2);
     expect((await Expense.findById(expense._id))?._version).toBe(2);
-    expect(await ConflictResolution.countDocuments({ conflictId: conflict._id })).toBe(1);
+    expect(
+      await ConflictResolution.countDocuments({ conflictId: conflict._id })
+    ).toBe(1);
   });
 
   it('finalizes an existing history record without duplicating it', async () => {
     const { expense, conflict } = await seedConflict();
     await SyncConflict.updateOne(
       { _id: conflict._id },
-      { $set: { resolutionState: 'resolving', claimedResolution: 'local', appliedRevision: 3 } }
+      {
+        $set: {
+          resolutionState: 'resolving',
+          claimedResolution: 'local',
+          appliedRevision: 3,
+        },
+      }
     );
     await Expense.updateOne(
       { _id: expense._id },
-      { $set: { amount: 200, _version: 3, _resolutionConflictId: String(conflict._id) } }
+      {
+        $set: {
+          amount: 200,
+          _version: 3,
+          _resolutionConflictId: String(conflict._id),
+        },
+      }
     );
     await ConflictResolution.create({
       conflictId: conflict._id,
@@ -250,8 +274,12 @@ describe('sync conflict resolution lifecycle', () => {
       resolution: 'local',
     });
     expect(result.entity._version).toBe(3);
-    expect(await ConflictResolution.countDocuments({ conflictId: conflict._id })).toBe(1);
-    expect((await SyncConflict.findById(conflict._id))?.resolvedAt).toEqual(expect.any(Date));
+    expect(
+      await ConflictResolution.countDocuments({ conflictId: conflict._id })
+    ).toBe(1);
+    expect((await SyncConflict.findById(conflict._id))?.resolvedAt).toEqual(
+      expect.any(Date)
+    );
   });
 
   it.each(['local', 'merge'] as const)(
@@ -260,7 +288,9 @@ describe('sync conflict resolution lifecycle', () => {
       const { expense, conflict } = await seedConflict();
       await SyncConflict.updateOne(
         { _id: conflict._id },
-        { $set: { resolutionState: 'resolving', claimedResolution: resolution } }
+        {
+          $set: { resolutionState: 'resolving', claimedResolution: resolution },
+        }
       );
       const result = await new SyncService().resolveConflict(userA, {
         conflictId: conflict._id.toString(),
@@ -270,7 +300,9 @@ describe('sync conflict resolution lifecycle', () => {
         mergedData: resolution === 'merge' ? { amount: 250 } : undefined,
       });
       expect(result.entity._version).toBe(3);
-      expect(await ConflictResolution.countDocuments({ conflictId: conflict._id })).toBe(1);
+      expect(
+        await ConflictResolution.countDocuments({ conflictId: conflict._id })
+      ).toBe(1);
     }
   );
 
@@ -289,7 +321,9 @@ describe('sync conflict resolution lifecycle', () => {
       })
     ).rejects.toThrow('Conflict already claimed with a different choice');
     expect((await Expense.findById(expense._id))?.amount).toBe(300);
-    expect(await ConflictResolution.countDocuments({ conflictId: conflict._id })).toBe(0);
+    expect(
+      await ConflictResolution.countDocuments({ conflictId: conflict._id })
+    ).toBe(0);
   });
 
   it('does not treat an unrelated entity marker as proof of application', async () => {
@@ -306,6 +340,8 @@ describe('sync conflict resolution lifecycle', () => {
         resolution: 'local',
       })
     ).rejects.toThrow('SYNC_CONFLICT_STALE_RESOLUTION');
-    expect(await ConflictResolution.countDocuments({ conflictId: conflict._id })).toBe(0);
+    expect(
+      await ConflictResolution.countDocuments({ conflictId: conflict._id })
+    ).toBe(0);
   });
 });

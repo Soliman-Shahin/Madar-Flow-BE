@@ -16,8 +16,12 @@ async function token(email: string) {
     .set('X-Forwarded-For', freshIp())
     .send({
       data: encryptCryptoJS({
-        email, password: PASSWORD, termsAccepted: true, privacyAccepted: true,
-        termsVersion: CONSENT_VERSIONS.terms, privacyVersion: CONSENT_VERSIONS.privacy,
+        email,
+        password: PASSWORD,
+        termsAccepted: true,
+        privacyAccepted: true,
+        termsVersion: CONSENT_VERSIONS.terms,
+        privacyVersion: CONSENT_VERSIONS.privacy,
       }),
     });
   expect(res.status).toBe(200);
@@ -28,33 +32,73 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 async function seed() {
   const a = await token('iso-a@example.test');
   const b = await token('iso-b@example.test');
-  const cat = await request(app).post('/v1/categories/create').set(auth(a))
-    .send({ title: 'A private', icon: 'cart-outline', color: '#3366CC', type: 'outcome' });
+  const cat = await request(app)
+    .post('/v1/categories/create')
+    .set(auth(a))
+    .send({
+      title: 'A private',
+      icon: 'cart-outline',
+      color: '#3366CC',
+      type: 'outcome',
+    });
   expect(cat.status).toBe(201);
-  const exp = await request(app).post('/v1/expenses').set(auth(a))
-    .send({ description: 'A secret', amount: 12, category: cat.body.data._id, date: new Date().toISOString() });
+  const exp = await request(app)
+    .post('/v1/expenses')
+    .set(auth(a))
+    .send({
+      description: 'A secret',
+      amount: 12,
+      category: cat.body.data._id,
+      date: new Date().toISOString(),
+    });
   expect([200, 201]).toContain(exp.status);
-  return { a, b, catId: cat.body.data._id as string, expId: exp.body.data._id as string };
+  return {
+    a,
+    b,
+    catId: cat.body.data._id as string,
+    expId: exp.body.data._id as string,
+  };
 }
 
-beforeEach(async () => { await planService.seedDefaultPlans(); });
+beforeEach(async () => {
+  await planService.seedDefaultPlans();
+});
 
 describe('cross-user isolation (IDOR)', () => {
   it('user B cannot read, update or delete user A category', async () => {
     const { b, catId } = await seed();
-    expect((await request(app).get(`/v1/categories/${catId}`).set(auth(b))).status).toBeGreaterThanOrEqual(403);
-    const upd = await request(app).put(`/v1/categories/update/${catId}`).set(auth(b)).send({ title: 'hijacked' });
+    expect(
+      (await request(app).get(`/v1/categories/${catId}`).set(auth(b))).status
+    ).toBeGreaterThanOrEqual(403);
+    const upd = await request(app)
+      .put(`/v1/categories/update/${catId}`)
+      .set(auth(b))
+      .send({ title: 'hijacked' });
     expect(upd.status).toBeGreaterThanOrEqual(403);
-    expect((await request(app).delete(`/v1/categories/delete/${catId}`).set(auth(b))).status).toBeGreaterThanOrEqual(403);
+    expect(
+      (await request(app).delete(`/v1/categories/delete/${catId}`).set(auth(b)))
+        .status
+    ).toBeGreaterThanOrEqual(403);
   });
 
   it('user B cannot read, update or delete user A expense', async () => {
     const { b, expId, catId } = await seed();
-    expect((await request(app).get(`/v1/expenses/${expId}`).set(auth(b))).status).toBeGreaterThanOrEqual(403);
-    const upd = await request(app).put(`/v1/expenses/${expId}`).set(auth(b))
-      .send({ description: 'hijacked', amount: 1, category: catId, date: new Date().toISOString() });
+    expect(
+      (await request(app).get(`/v1/expenses/${expId}`).set(auth(b))).status
+    ).toBeGreaterThanOrEqual(403);
+    const upd = await request(app)
+      .put(`/v1/expenses/${expId}`)
+      .set(auth(b))
+      .send({
+        description: 'hijacked',
+        amount: 1,
+        category: catId,
+        date: new Date().toISOString(),
+      });
     expect(upd.status).toBeGreaterThanOrEqual(403);
-    expect((await request(app).delete(`/v1/expenses/${expId}`).set(auth(b))).status).toBeGreaterThanOrEqual(403);
+    expect(
+      (await request(app).delete(`/v1/expenses/${expId}`).set(auth(b))).status
+    ).toBeGreaterThanOrEqual(403);
   });
 
   it("lists never include another user's data", async () => {
@@ -67,7 +111,9 @@ describe('cross-user isolation (IDOR)', () => {
 
   it("update-order cannot reorder another user's category", async () => {
     const { b, a, catId } = await seed();
-    await request(app).put('/v1/categories/update-order').set(auth(b))
+    await request(app)
+      .put('/v1/categories/update-order')
+      .set(auth(b))
       .send({ categories: [{ categoryId: catId, order: 99 }] });
     const mine = await request(app).get('/v1/categories/list').set(auth(a));
     const found = JSON.stringify(mine.body);
@@ -77,8 +123,15 @@ describe('cross-user isolation (IDOR)', () => {
 
   it("an expense cannot be created against another user's category", async () => {
     const { b, catId } = await seed();
-    const res = await request(app).post('/v1/expenses').set(auth(b))
-      .send({ description: 'cross ref', amount: 5, category: catId, date: new Date().toISOString() });
+    const res = await request(app)
+      .post('/v1/expenses')
+      .set(auth(b))
+      .send({
+        description: 'cross ref',
+        amount: 5,
+        category: catId,
+        date: new Date().toISOString(),
+      });
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });

@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { auditLogController } from '../controllers/audit-log.controller';
 import { verifyAccessToken } from '../middleware/access.middleware';
-import { requireAdmin, requireSuperAdmin } from '../middleware/admin.middleware';
+import {
+  requireAdmin,
+  requireSuperAdmin,
+} from '../middleware/admin.middleware';
 
 const router = Router();
 

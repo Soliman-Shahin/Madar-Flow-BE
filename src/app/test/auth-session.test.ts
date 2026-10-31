@@ -77,7 +77,9 @@ describe('AUTH.1 session contract', () => {
     const cookieHeaders: string[] = Array.isArray(login.headers['set-cookie'])
       ? login.headers['set-cookie']
       : [String(login.headers['set-cookie'] || '')];
-    const cookie = cookieHeaders.find((value) => value.startsWith('mf_refresh='));
+    const cookie = cookieHeaders.find((value) =>
+      value.startsWith('mf_refresh=')
+    );
     expect(cookie).toContain('HttpOnly');
     expect(cookie).toContain('Path=/v1/user');
 
@@ -195,7 +197,9 @@ describe('AUTH.1 session contract', () => {
     expect(results.filter(Boolean)).toHaveLength(1);
     const saved = await User.findById(user._id);
     expect(saved!.sessions).toHaveLength(2);
-    expect(saved!.sessions.filter((item) => item.token === hash(other))).toHaveLength(1);
+    expect(
+      saved!.sessions.filter((item) => item.token === hash(other))
+    ).toHaveLength(1);
     const upgraded = saved!.sessions.find((item) => item.token !== hash(other));
     expect(upgraded?.sessionId).toEqual(expect.any(String));
     expect(upgraded?.token).toBe(hash(results.find(Boolean)!.refreshToken));
@@ -312,15 +316,27 @@ describe('AUTH.1 session contract', () => {
   });
   it('lists safe active sessions and revokes only other devices on request', async () => {
     const user = await account();
-    const current = await UserService.createAuthenticatedSession(user, 'password', 'ios');
-    const other = await UserService.createAuthenticatedSession(user, 'password', 'web');
+    const current = await UserService.createAuthenticatedSession(
+      user,
+      'password',
+      'ios'
+    );
+    const other = await UserService.createAuthenticatedSession(
+      user,
+      'password',
+      'web'
+    );
     const listed = await request(app)
       .get('/v1/user/sessions')
       .set('Authorization', `Bearer ${current.accessToken}`);
     expect(listed.status).toBe(200);
     expect(listed.body.data.sessions).toHaveLength(2);
-    expect(listed.body.data.sessions.find((item: any) => item.current)).toMatchObject({ platform: 'ios', current: true });
-    expect(JSON.stringify(listed.body)).not.toContain(hash(current.refreshToken));
+    expect(
+      listed.body.data.sessions.find((item: any) => item.current)
+    ).toMatchObject({ platform: 'ios', current: true });
+    expect(JSON.stringify(listed.body)).not.toContain(
+      hash(current.refreshToken)
+    );
     expect(JSON.stringify(listed.body)).not.toContain('refreshToken');
 
     const revoked = await request(app)
@@ -328,17 +344,26 @@ describe('AUTH.1 session contract', () => {
       .set('Authorization', `Bearer ${current.accessToken}`);
     expect(revoked.status).toBe(200);
     expect(revoked.body.data.revoked).toBe(true);
-    expect(await UserService.rotateRefreshToken(current.refreshToken)).not.toBeNull();
+    expect(
+      await UserService.rotateRefreshToken(current.refreshToken)
+    ).not.toBeNull();
     expect(await UserService.rotateRefreshToken(other.refreshToken)).toBeNull();
   });
   it('does not let a session-management endpoint revoke the current session accidentally', async () => {
     const user = await account();
-    const current = await UserService.createAuthenticatedSession(user, 'password');
+    const current = await UserService.createAuthenticatedSession(
+      user,
+      'password'
+    );
     const revoked = await request(app)
-      .delete(`/v1/user/sessions/${user.sessions[0]?.sessionId || (jwt.verify(current.accessToken, process.env.ACCESS_TOKEN_SECRET!) as any).sid}`)
+      .delete(
+        `/v1/user/sessions/${user.sessions[0]?.sessionId || (jwt.verify(current.accessToken, process.env.ACCESS_TOKEN_SECRET!) as any).sid}`
+      )
       .set('Authorization', `Bearer ${current.accessToken}`);
     expect(revoked.status).toBe(400);
-    expect(await UserService.rotateRefreshToken(current.refreshToken)).not.toBeNull();
+    expect(
+      await UserService.rotateRefreshToken(current.refreshToken)
+    ).not.toBeNull();
   });
   it('rejects access tokens whose persisted session has expired', async () => {
     const user = await account();
