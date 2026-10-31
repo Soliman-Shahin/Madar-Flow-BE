@@ -1,4 +1,6 @@
 import logger from './logger.service';
+import { SyncOperationLedger } from './sync/sync-ledger.service';
+import { SyncConflictService } from './sync/sync-conflict.service';
 import { assertOwnsCategory } from '../shared/ownership';
 import { Expense } from '../models/expense.model';
 import { Category } from '../models/category.model';
@@ -19,46 +21,6 @@ import { createHash, randomUUID } from 'crypto';
 const conflictDedupeKey = (userId: string, entity: any, server: any): string =>
   `${userId}:${String(entity._entityType || 'unknown')}:${String(entity._id || entity._clientId || 'unknown')}:${String(entity._version || entity._lastModified || 'unknown')}:${String(server?._version || server?._lastModified || 'unknown')}`;
 
-const REPEATED_FAILURE_THRESHOLD = 3;
-const OPERATION_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{6,63}$/i;
-
-const stableCanonicalize = (value: any): any => {
-  if (value instanceof Date) return value.toISOString();
-  if (Array.isArray(value)) return value.map(stableCanonicalize);
-  if (value && typeof value === 'object') {
-    return Object.keys(value)
-      .sort()
-      .reduce((result: Record<string, unknown>, key) => {
-        result[key] = stableCanonicalize(value[key]);
-        return result;
-      }, {});
-  }
-  return value;
-};
-
-const mutationFingerprint = (entity: any): string => {
-  const data = Object.keys(entity)
-    .filter(
-      (key) =>
-        ![
-          '_operationId',
-          '_operationType',
-          '_receiptId',
-          '_retryCount',
-          '_maxRetries',
-          '_syncError',
-        ].includes(key)
-    )
-    .sort()
-    .reduce((result: Record<string, unknown>, key) => {
-      result[key] = entity[key];
-      return result;
-    }, {});
-  return createHash('sha256')
-    .update(JSON.stringify(stableCanonicalize(data)))
-    .digest('hex');
-};
-
 export interface SyncRequest {
   lastSyncTime?: Date;
   entityType?: 'expense' | 'outcome' | 'category' | 'user';
@@ -74,14 +36,6 @@ export interface SyncResponse {
   totalCount: number;
 }
 
-export interface ConflictResolutionRequest {
-  conflictId?: string;
-  entityId: string;
-  entityType: string;
-  resolution: 'local' | 'server' | 'merge';
-  mergedData?: any;
-}
-
 /**
  * 🔄 Sync Service - Professional Backend Implementation
  *
@@ -90,8 +44,21 @@ export interface ConflictResolutionRequest {
  * 2. إدارة التعارضات
  * 3. تتبع metadata المزامنة
  */
+export type { ConflictResolutionRequest } from './sync/sync-conflict.service';
+
 export class SyncService {
+  private readonly ledger = new SyncOperationLedger();
+  private readonly conflictService = new SyncConflictService();
+
   constructor() {}
+
+  resolveConflict(...args: Parameters<SyncConflictService['resolveConflict']>) {
+    return this.conflictService.resolveConflict(...args);
+  }
+
+  getConflicts(...args: Parameters<SyncConflictService['getConflicts']>) {
+    return this.conflictService.getConflicts(...args);
+  }
 
   // ==================== PULL DATA FROM CLIENT ====================
 
@@ -276,7 +243,10 @@ export class SyncService {
       for (const entity of entities) {
         let processingEntity = entity;
         try {
-          const registration = await this.registerOperation(userId, entity);
+          const registration = await this.ledger.registerOperation(
+            userId,
+            entity
+          );
           const requestedOperationType =
             entity._operationType ||
             (entity._isDeleted
@@ -320,11 +290,11 @@ export class SyncService {
               `⚠️ [SYNC] Conflict detected for ${entity._entityType}:${entity._id}`
             );
           } else {
-            await this.clearObservedFailure(userId, processingEntity);
+            await this.ledger.clearObservedFailure(userId, processingEntity);
             processed++;
           }
         } catch (error: any) {
-          await this.recordObservedFailure(userId, processingEntity);
+          await this.ledger.recordObservedFailure(userId, processingEntity);
           logger.error(
             `❌ [SYNC] Error processing entity ${entity._id}:`,
             error
@@ -351,284 +321,6 @@ export class SyncService {
     } catch (error: any) {
       logger.error('❌ [SYNC] Push error:', error);
       throw new Error(`Failed to push sync data: ${error.message}`);
-    }
-  }
-
-  private async recordObservedFailure(
-    userId: string,
-    entity: any
-  ): Promise<void> {
-    const receiptId =
-      typeof entity._receiptId === 'string' ? entity._receiptId : '';
-    const operationId =
-      typeof entity._operationId === 'string' ? entity._operationId.trim() : '';
-    const entityType = String(entity._entityType || 'unknown');
-    const entityId = String(entity._id || entity._clientId || 'unknown');
-
-    if (
-      !receiptId ||
-      !OPERATION_ID_PATTERN.test(operationId) ||
-      !['expense', 'outcome', 'category'].includes(entityType) ||
-      !entityId ||
-      entityId.length > 200
-    ) {
-      return;
-    }
-
-    try {
-      const registration = await SyncRegistration.findOne({
-        user: new mongoose.Types.ObjectId(userId),
-        receiptId,
-        clientOperationId: operationId,
-      }).lean();
-      if (
-        !registration ||
-        registration.entityType !== entityType ||
-        registration.entityId !== entityId
-      )
-        return;
-      const identityFilter = {
-        user: new mongoose.Types.ObjectId(userId),
-        registrationId: registration.receiptId,
-      };
-      let existing = await SyncFailure.findOne(identityFilter).lean();
-      let reclaimed = false;
-      if (
-        existing?.terminal &&
-        existing.dispatchState === 'dispatching' &&
-        existing.updatedAt &&
-        Date.now() - new Date(existing.updatedAt).getTime() > 5 * 60 * 1000
-      ) {
-        const reclaim = await SyncFailure.updateOne(
-          { _id: existing._id, terminal: true, dispatchState: 'dispatching' },
-          { $set: { terminal: false, dispatchState: 'pending' } }
-        );
-        reclaimed = reclaim.modifiedCount === 1;
-        existing = await SyncFailure.findById(existing._id).lean();
-        if (!reclaimed) return;
-      }
-      if (existing?.terminal && existing.dispatchState !== 'dispatching')
-        return;
-      if (reclaimed && existing) {
-        await this.dispatchRepeatedFailure(userId, existing);
-        return;
-      }
-
-      let failure;
-      try {
-        failure = await SyncFailure.findOneAndUpdate(
-          { ...identityFilter, terminal: false },
-          {
-            $setOnInsert: {
-              user: userId,
-              registrationId: registration.receiptId,
-              operationId,
-              entityType,
-              entityId,
-              dispatchState: 'pending',
-            },
-            $inc: { attemptCount: 1 },
-          },
-          { upsert: true, returnDocument: 'after' }
-        ).lean();
-      } catch (error: any) {
-        if (error?.code === 11000) {
-          failure = await SyncFailure.findOneAndUpdate(
-            { ...identityFilter, terminal: false },
-            { $inc: { attemptCount: 1 } },
-            { returnDocument: 'after' }
-          ).lean();
-        } else {
-          throw error;
-        }
-      }
-
-      if (
-        !failure ||
-        failure.terminal ||
-        failure.attemptCount < REPEATED_FAILURE_THRESHOLD
-      )
-        return;
-
-      const terminal = await SyncFailure.findOneAndUpdate(
-        { _id: failure._id, terminal: false, dispatchState: 'pending' },
-        { $set: { terminal: true, dispatchState: 'dispatching' } },
-        { returnDocument: 'after' }
-      ).lean();
-      if (!terminal) return;
-
-      await this.dispatchRepeatedFailure(userId, terminal);
-    } catch (error) {
-      logger.warn('[SYNC] Repeated-failure notification dispatch failed', {
-        operationId,
-        userId,
-        error: error instanceof Error ? error.message : 'DISPATCH_FAILED',
-      });
-    }
-  }
-
-  private async dispatchRepeatedFailure(
-    userId: string,
-    failure: any
-  ): Promise<void> {
-    const claimed = await SyncFailure.findOneAndUpdate(
-      { _id: failure._id, terminal: false, dispatchState: 'pending' },
-      { $set: { terminal: true, dispatchState: 'dispatching' } },
-      { returnDocument: 'after' }
-    ).lean();
-    const dispatching = claimed || failure;
-    try {
-      await NotificationService.dispatchUserEvent({
-        userId,
-        event: 'sync.repeated_failure',
-        dedupeKey: `${userId}:sync-repeated-failure:${dispatching.registrationId}`,
-        title: 'Sync repeatedly failed / فشلت المزامنة عدة مرات',
-        message:
-          'A change could not be synchronized after several attempts. / تعذر مزامنة تغيير بعد عدة محاولات.',
-        metadata: {
-          operationId: dispatching.operationId,
-          registrationId: dispatching.registrationId,
-          entityType: dispatching.entityType,
-          entityId: dispatching.entityId,
-          failureCount: dispatching.attemptCount,
-        },
-      });
-      await SyncFailure.updateOne(
-        { _id: dispatching._id, dispatchState: 'dispatching' },
-        { $set: { dispatchState: 'dispatched' } }
-      );
-    } catch (dispatchError) {
-      await SyncFailure.updateOne(
-        { _id: dispatching._id, dispatchState: 'dispatching' },
-        { $set: { terminal: false, dispatchState: 'pending' } }
-      );
-      throw dispatchError;
-    }
-  }
-
-  private async registerOperation(userId: string, entity: any) {
-    const operationId =
-      typeof entity._operationId === 'string' ? entity._operationId.trim() : '';
-    const operationType =
-      entity._operationType ||
-      (entity._isDeleted
-        ? 'DELETE'
-        : entity._baseVersion != null
-          ? 'UPDATE'
-          : 'CREATE');
-    const entityType = String(entity._entityType || '');
-    const entityId = String(entity._id || '');
-    if (
-      !OPERATION_ID_PATTERN.test(operationId) ||
-      !['CREATE', 'UPDATE', 'DELETE'].includes(operationType) ||
-      !['expense', 'outcome', 'category'].includes(entityType) ||
-      !entityId ||
-      entityId.length > 200
-    )
-      return null;
-    const fingerprint = mutationFingerprint(entity);
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    if (entity._receiptId) {
-      const receipt = await SyncRegistration.findOne({
-        receiptId: entity._receiptId,
-      }).lean();
-      if (!receipt || String(receipt.user) !== String(userObjectId))
-        throw new Error('SYNC_RECEIPT_MISMATCH');
-      if (
-        receipt.clientOperationId !== operationId ||
-        receipt.entityType !== entityType ||
-        receipt.entityId !== entityId ||
-        receipt.operationType !== operationType ||
-        receipt.fingerprint !== fingerprint
-      )
-        throw new Error('SYNC_RECEIPT_MISMATCH');
-    }
-    const existing = await SyncRegistration.findOne({
-      user: userObjectId,
-      clientOperationId: operationId,
-    }).lean();
-    if (existing) {
-      if (
-        (entity._receiptId && entity._receiptId !== existing.receiptId) ||
-        existing.entityType !== entityType ||
-        existing.entityId !== entityId ||
-        existing.operationType !== operationType ||
-        existing.fingerprint !== fingerprint
-      )
-        throw new Error('SYNC_RECEIPT_MISMATCH');
-      return existing;
-    }
-    if (operationType !== 'CREATE') {
-      const Model: any = entityType === 'category' ? Category : Expense;
-      const owned = await Model.findOne({ _id: entityId, user: userObjectId })
-        .select('_version')
-        .lean();
-      if (!owned) throw new Error('SYNC_REGISTRATION_REQUIRED');
-      if (entity._baseVersion != null && owned._version !== entity._baseVersion)
-        return null;
-    }
-    try {
-      return await SyncRegistration.findOneAndUpdate(
-        { user: userObjectId, clientOperationId: operationId },
-        {
-          $setOnInsert: {
-            receiptId: randomUUID(),
-            user: userObjectId,
-            clientOperationId: operationId,
-            operationType,
-            entityType,
-            entityId,
-            baseVersion: entity._baseVersion,
-            fingerprint,
-            state: 'registered',
-          },
-        },
-        { upsert: true, returnDocument: 'after' }
-      ).lean();
-    } catch (error: any) {
-      if (error?.code === 11000) {
-        const winner = await SyncRegistration.findOne({
-          user: userObjectId,
-          clientOperationId: operationId,
-        }).lean();
-        if (
-          !winner ||
-          winner.operationType !== operationType ||
-          winner.entityType !== entityType ||
-          winner.entityId !== entityId ||
-          winner.baseVersion !== entity._baseVersion ||
-          winner.fingerprint !== fingerprint
-        )
-          throw new Error('SYNC_RECEIPT_MISMATCH');
-        return winner;
-      }
-      throw error;
-    }
-  }
-
-  private async clearObservedFailure(
-    userId: string,
-    entity: any
-  ): Promise<void> {
-    const entityType = String(entity._entityType || 'unknown');
-    const entityId = String(entity._id || entity._clientId || 'unknown');
-    if (!['expense', 'outcome', 'category'].includes(entityType) || !entityId)
-      return;
-    if (typeof entity._receiptId === 'string') {
-      await SyncRegistration.updateOne(
-        {
-          user: new mongoose.Types.ObjectId(userId),
-          receiptId: entity._receiptId,
-        },
-        { $set: { state: 'completed' } }
-      );
-    }
-    if (typeof entity._receiptId === 'string') {
-      await SyncFailure.deleteOne({
-        user: new mongoose.Types.ObjectId(userId),
-        registrationId: entity._receiptId,
-        terminal: false,
-      });
     }
   }
 
@@ -983,240 +675,6 @@ export class SyncService {
   }
 
   // ==================== CONFLICT RESOLUTION ====================
-
-  async resolveConflict(
-    userId: string,
-    request: ConflictResolutionRequest
-  ): Promise<any> {
-    const { conflictId, entityId, entityType, resolution, mergedData } =
-      request;
-    logger.info(
-      `🔧 [SYNC] Resolving conflict for ${entityType}:${entityId} with strategy: ${resolution}`
-    );
-
-    try {
-      const userObjectId = new mongoose.Types.ObjectId(userId);
-      let Model: any;
-
-      switch (entityType) {
-        case 'expense':
-        case 'outcome':
-          Model = Expense;
-          break;
-        case 'category':
-          Model = Category;
-          break;
-        default:
-          throw new Error(`Unknown entity type: ${entityType}`);
-      }
-
-      const conflictQuery: any = conflictId
-        ? {
-            _id: conflictId,
-            user: userObjectId,
-          }
-        : {
-            entityId,
-            entityType,
-            user: userObjectId,
-            resolvedAt: { $exists: false },
-          };
-      const conflict: any = await SyncConflict.findOne(conflictQuery).lean();
-      if (!conflict) throw new Error('Conflict not found or already resolved');
-      if (conflict.entityId !== entityId || conflict.entityType !== entityType)
-        throw new Error('Conflict identity mismatch');
-
-      const priorResolution: any = await ConflictResolution.findOne({
-        conflictId: conflict._id,
-        user: userObjectId,
-      }).lean();
-      if (conflict.resolvedAt || priorResolution) {
-        if (!priorResolution || priorResolution.resolution !== resolution)
-          throw new Error('Conflict already resolved with a different choice');
-        await SyncConflict.updateOne(
-          {
-            _id: conflict._id,
-            user: userObjectId,
-            resolvedAt: { $exists: false },
-          },
-          { $set: { resolvedAt: new Date(), resolutionState: 'resolved' } }
-        );
-        const resolvedEntity = await Model.findOne({
-          _id: entityId,
-          user: userObjectId,
-        }).lean();
-        return {
-          conflictId: String(conflict._id),
-          entityType,
-          entityId,
-          entity: resolvedEntity,
-          resolution: 'resolved',
-        };
-      }
-      const claimed = await SyncConflict.findOneAndUpdate(
-        {
-          _id: conflict._id,
-          user: userObjectId,
-          resolvedAt: { $exists: false },
-          $or: [
-            { resolutionState: { $exists: false } },
-            { resolutionState: 'resolving', claimedResolution: resolution },
-          ],
-        },
-        {
-          $set: { resolutionState: 'resolving', claimedResolution: resolution },
-        },
-        { returnDocument: 'after' }
-      ).lean();
-      if (!claimed)
-        throw new Error('Conflict already claimed with a different choice');
-      const entity = await Model.findOne({ _id: entityId, user: userObjectId });
-      if (!entity) throw new Error('Entity not found');
-      const expectedVersion = Number(conflict.serverData?._version);
-      if (!Number.isInteger(expectedVersion))
-        throw new Error('Conflict revision is invalid');
-
-      let resolvedData: any;
-
-      if (resolution === 'local') {
-        resolvedData = conflict.localData;
-      } else if (resolution === 'merge') {
-        if (
-          !mergedData ||
-          typeof mergedData !== 'object' ||
-          Array.isArray(mergedData)
-        )
-          throw new Error('Merged data is required');
-        resolvedData = mergedData;
-      }
-
-      const {
-        _id: ignoredId,
-        user: ignoredUser,
-        createdAt: ignoredCreatedAt,
-        updatedAt: ignoredUpdatedAt,
-        __v: ignoredVersionKey,
-        _version: ignoredRevision,
-        _syncStatus: ignoredSyncStatus,
-        _lastModified: ignoredLastModified,
-        _resolutionConflictId: ignoredResolutionMarker,
-        _conflictData: ignoredConflictData,
-        ...writableData
-      } = resolvedData || {};
-
-      // Use Server is a conditional no-op CAS: the authoritative server data
-      // is already current, so resolution must not rewrite it or advance its
-      // revision. Local and Merge intentionally mutate the entity and advance it.
-      const entityAlreadyApplied =
-        resolution !== 'server' &&
-        String((entity as any)._resolutionConflictId || '') ===
-          String(conflict._id) &&
-        Number(entity._version) === expectedVersion + 1;
-      const updateResult =
-        resolution === 'server'
-          ? await Model.updateOne(
-              { _id: entityId, user: userObjectId, _version: expectedVersion },
-              { $set: { _version: expectedVersion } }
-            )
-          : entityAlreadyApplied
-            ? { matchedCount: 1 }
-            : await Model.updateOne(
-                {
-                  _id: entityId,
-                  user: userObjectId,
-                  _version: expectedVersion,
-                },
-                {
-                  $set: {
-                    ...writableData,
-                    _syncStatus: 'synced',
-                    _lastModified: new Date(),
-                    _version: expectedVersion + 1,
-                    _resolutionConflictId: String(conflict._id),
-                  },
-                  $unset: { _conflictData: 1 },
-                }
-              );
-      if (updateResult.matchedCount !== 1)
-        throw new Error('SYNC_CONFLICT_STALE_RESOLUTION');
-      await SyncConflict.updateOne(
-        {
-          _id: conflict._id,
-          user: userObjectId,
-          resolvedAt: { $exists: false },
-        },
-        {
-          $set: {
-            appliedRevision:
-              resolution === 'server' ? expectedVersion : expectedVersion + 1,
-          },
-        }
-      );
-      const resolvedEntity = await Model.findOne({
-        _id: entityId,
-        user: userObjectId,
-      }).lean();
-
-      // Record resolution
-      await ConflictResolution.create({
-        conflictId: conflict._id,
-        entityId,
-        entityType,
-        localData: entity.toObject(),
-        serverData: conflict.serverData,
-        resolution,
-        mergedData,
-        user: userObjectId,
-      });
-      await SyncConflict.updateOne(
-        {
-          _id: conflict._id,
-          user: userObjectId,
-          entityId,
-          entityType,
-          resolvedAt: { $exists: false },
-        },
-        { $set: { resolvedAt: new Date(), resolutionState: 'resolved' } }
-      );
-
-      logger.info(`✅ [SYNC] Conflict resolved for ${entityType}:${entityId}`);
-      return {
-        conflictId: String(conflict._id),
-        entityType,
-        entityId,
-        entity: resolvedEntity,
-        resolution: 'resolved',
-      };
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Conflict resolution error:', error);
-      throw new Error(`Failed to resolve conflict: ${error.message}`);
-    }
-  }
-
-  async getConflicts(userId: string): Promise<any[]> {
-    try {
-      const userObjectId = new mongoose.Types.ObjectId(userId);
-      const conflicts = await SyncConflict.find({
-        user: userObjectId,
-        resolvedAt: { $exists: false },
-      })
-        .sort({ detectedAt: -1 })
-        .limit(50)
-        .lean();
-
-      return conflicts.map((conflict: any) => ({
-        conflictId: String(conflict._id),
-        entityId: conflict.entityId,
-        entityType: conflict.entityType,
-        localData: conflict.localData,
-        serverData: conflict.serverData,
-        timestamp: conflict.detectedAt,
-      }));
-    } catch (error) {
-      logger.error('❌ [SYNC] Get conflicts error:', error as Error);
-      return [];
-    }
-  }
 
   // ==================== SYNC METADATA ====================
 

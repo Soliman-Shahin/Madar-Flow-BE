@@ -13,14 +13,12 @@ jest.mock('../services/socket.service', () => ({
 }));
 jest.mock('../services/push-delivery.service', () => ({
   PushDeliveryService: {
-    sendToUsers: jest
-      .fn()
-      .mockResolvedValue({
-        attempted: 0,
-        succeeded: 0,
-        failed: 0,
-        invalidTokens: 0,
-      }),
+    sendToUsers: jest.fn().mockResolvedValue({
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      invalidTokens: 0,
+    }),
   },
 }));
 
@@ -95,8 +93,8 @@ describe('sync receipt contract', () => {
   it('resolves concurrent identical registration idempotently and rejects a mismatched winner', async () => {
     const entity = failedCreate('concurrent-registration');
     const registrations = await Promise.all([
-      (service as any).registerOperation(userA, entity),
-      (service as any).registerOperation(userA, entity),
+      (service as any).ledger.registerOperation(userA, entity),
+      (service as any).ledger.registerOperation(userA, entity),
     ]);
     expect(registrations[0].receiptId).toBe(registrations[1].receiptId);
     expect(
@@ -105,7 +103,10 @@ describe('sync receipt contract', () => {
       })
     ).toBe(1);
     await expect(
-      (service as any).registerOperation(userA, { ...entity, amount: 11 })
+      (service as any).ledger.registerOperation(userA, {
+        ...entity,
+        amount: 11,
+      })
     ).rejects.toThrow('SYNC_RECEIPT_MISMATCH');
   });
 
@@ -211,7 +212,7 @@ describe('sync receipt contract', () => {
 
   async function failureRegistration(id: string) {
     const entity = failedCreate(id);
-    const registration = await (service as any).registerOperation(
+    const registration = await (service as any).ledger.registerOperation(
       userA,
       entity
     );
@@ -287,7 +288,9 @@ describe('sync receipt contract', () => {
 
   it('resets failure history on success and requires three post-reset failures', async () => {
     const { entity, registration } = await failureRegistration('reset-direct');
-    await Promise.all([(service as any).recordObservedFailure(userA, entity)]);
+    await Promise.all([
+      (service as any).ledger.recordObservedFailure(userA, entity),
+    ]);
     const category = {
       _operationId: 'reset-success-direct',
       _operationType: 'CREATE',
@@ -300,16 +303,16 @@ describe('sync receipt contract', () => {
       order: 0,
     };
     await service.pushData(userA, [category]);
-    await (service as any).clearObservedFailure(userA, entity);
+    await (service as any).ledger.clearObservedFailure(userA, entity);
     expect(
       await SyncFailure.findOne({ registrationId: registration.receiptId })
     ).toBeNull();
-    await (service as any).recordObservedFailure(userA, entity);
-    await (service as any).recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
     expect(
       await Notification.countDocuments({ event: 'sync.repeated_failure' })
     ).toBe(0);
-    await (service as any).recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
     expect(
       await Notification.countDocuments({ event: 'sync.repeated_failure' })
     ).toBe(1);
@@ -319,8 +322,8 @@ describe('sync receipt contract', () => {
     const { entity, registration } =
       await failureRegistration('parallel-first');
     await Promise.all([
-      (service as any).recordObservedFailure(userA, entity),
-      (service as any).recordObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
     ]);
     expect(
       (await SyncFailure.findOne({ registrationId: registration.receiptId }))
@@ -345,8 +348,8 @@ describe('sync receipt contract', () => {
       dispatchState: 'pending',
     });
     await Promise.all([
-      (service as any).recordObservedFailure(userA, entity),
-      (service as any).recordObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
     ]);
     expect(
       await Notification.countDocuments({ event: 'sync.repeated_failure' })
@@ -355,7 +358,7 @@ describe('sync receipt contract', () => {
       (await SyncFailure.findOne({ registrationId: registration.receiptId }))
         ?.dispatchState
     ).toBe('dispatched');
-    await (service as any).recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
     expect(
       await Notification.countDocuments({ event: 'sync.repeated_failure' })
     ).toBe(1);
@@ -374,8 +377,8 @@ describe('sync receipt contract', () => {
       dispatchState: 'pending',
     });
     await Promise.all([
-      (service as any).recordObservedFailure(userA, entity),
-      (service as any).clearObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
+      (service as any).ledger.clearObservedFailure(userA, entity),
     ]);
     expect(
       await Notification.countDocuments({ event: 'sync.repeated_failure' })
@@ -393,9 +396,9 @@ describe('sync receipt contract', () => {
     dispatch
       .mockRejectedValueOnce(new Error('dispatch down'))
       .mockResolvedValue({} as any);
-    await (service as any).recordObservedFailure(userA, entity);
-    await (service as any).recordObservedFailure(userA, entity);
-    await (service as any).recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
     expect(
       (await SyncFailure.findOne({ registrationId: registration.receiptId }))
         ?.dispatchState
@@ -404,7 +407,7 @@ describe('sync receipt contract', () => {
       (await SyncFailure.findOne({ registrationId: registration.receiptId }))
         ?.attemptCount
     ).toBe(3);
-    await (service as any).recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
     expect(
       (await SyncFailure.findOne({ registrationId: registration.receiptId }))
         ?.dispatchState
@@ -430,7 +433,7 @@ describe('sync receipt contract', () => {
         { registrationId: registration.receiptId },
         { $set: { updatedAt: new Date(Date.now() - 6 * 60 * 1000) } }
       );
-    await (service as any).recordObservedFailure(userA, entity);
+    await (service as any).ledger.recordObservedFailure(userA, entity);
     const state = await SyncFailure.findOne({
       registrationId: registration.receiptId,
     });
@@ -458,8 +461,8 @@ describe('sync receipt contract', () => {
         { $set: { updatedAt: new Date(Date.now() - 6 * 60 * 1000) } }
       );
     await Promise.all([
-      (service as any).recordObservedFailure(userA, entity),
-      (service as any).recordObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
+      (service as any).ledger.recordObservedFailure(userA, entity),
     ]);
     const state = await SyncFailure.findOne({
       registrationId: registration.receiptId,
