@@ -27,6 +27,8 @@ import './config/passport-config';
 import dotenv from 'dotenv';
 import { advancedEncryptionMiddleware } from './middleware/encryption-advanced.middleware';
 import mongoSanitize from 'express-mongo-sanitize';
+import { sendError } from './shared/helper';
+import { exceedsDepth } from './shared/search';
 import { requestLogger } from './middleware/request-logger.middleware';
 
 dotenv.config();
@@ -73,7 +75,10 @@ function configureExpressApp(): express.Application {
   // Sanitize data to prevent NoSQL injection
   // Note: Using direct sanitize() call instead of middleware because req.query
   // is a read-only getter in this Express version and the middleware crashes trying to reassign it.
-  app.use((req: any, _res: any, next: any) => {
+  app.use((req: any, res: any, next: any) => {
+    if (req.body && exceedsDepth(req.body, 40)) {
+      return sendError(res, 'Request body is nested too deeply', 400, 'BAD_REQUEST');
+    }
     if (req.body) mongoSanitize.sanitize(req.body);
     if (req.params) mongoSanitize.sanitize(req.params);
     next();

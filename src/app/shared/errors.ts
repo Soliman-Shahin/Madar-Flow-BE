@@ -315,6 +315,23 @@ export function toAppError(error: any): AppError {
     return new AppError('Invalid CSRF token', 403, 'CSRF_INVALID', true);
   }
 
+  // body-parser / http-errors failures are the client's fault, not a 500.
+  if (error?.type === 'entity.parse.failed') {
+    return new AppError('Malformed request body', 400, 'INVALID_JSON', true);
+  }
+  if (error?.type === 'entity.too.large') {
+    return new AppError('Request body too large', 413, 'PAYLOAD_TOO_LARGE', true);
+  }
+  if (
+    typeof error?.type === 'string' &&
+    /^(encoding|charset)./.test(error.type) &&
+    Number.isInteger(error.status) &&
+    error.status >= 400 &&
+    error.status < 500
+  ) {
+    return new AppError('Unsupported request encoding', error.status, 'BAD_REQUEST', true);
+  }
+
   // Handle Mongoose errors
   if (error.name === 'ValidationError') {
     return new ValidationError('Validation failed', error.errors);

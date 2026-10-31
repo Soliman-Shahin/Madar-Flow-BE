@@ -30,3 +30,18 @@ export function safeSortField(raw: unknown, fallback: string, allowed?: readonly
   if (allowed && !allowed.includes(raw)) return fallback;
   return raw;
 }
+
+/**
+ * True when a parsed JSON value nests deeper than `max` levels. Iterative on purpose: a recursive
+ * walk (including mongo-sanitize's) overflows the stack on a hostile payload and turns into a 500.
+ */
+export function exceedsDepth(value: unknown, max: number): boolean {
+  const stack: Array<[unknown, number]> = [[value, 1]];
+  while (stack.length) {
+    const [node, depth] = stack.pop() as [unknown, number];
+    if (node === null || typeof node !== 'object') continue;
+    if (depth > max) return true;
+    for (const child of Object.values(node as Record<string, unknown>)) stack.push([child, depth + 1]);
+  }
+  return false;
+}

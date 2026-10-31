@@ -105,3 +105,23 @@ describe('operator and regex injection', () => {
     expect(me.body.data.role ?? 'user').toBe('user');
   });
 });
+
+describe('malformed and oversized input', () => {
+  it('answers 400 (not 500) for broken JSON and a deeply nested payload', async () => {
+    const t = await signup('inj-json@example.test');
+    const broken = await request(app).post('/v1/expenses').set(auth(t)).set('Content-Type', 'application/json').send('{"a":');
+    expect(broken.status).toBe(400);
+    let deep = 'null';
+    for (let i = 0; i < 5000; i++) deep = `{"a":${deep}}`;
+    const nested = await request(app).post('/v1/expenses').set(auth(t)).set('Content-Type', 'application/json').send(deep);
+    expect(nested.status).toBe(400);
+  });
+
+  it('clamps junk paging values instead of crashing the query', async () => {
+    const t = await signup('inj-paging@example.test');
+    for (const qs of ['limit=1000000000&skip=-5', 'limit=abc&skip=xyz', 'limit=-1', 'skip=-100']) {
+      const res = await request(app).get(`/v1/expenses?${qs}`).set(auth(t));
+      expect(res.status).toBe(200);
+    }
+  });
+});

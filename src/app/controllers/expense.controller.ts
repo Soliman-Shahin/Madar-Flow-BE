@@ -28,6 +28,14 @@ export const createExpense = async (req: CustomRequest, res: Response) => {
   }
 };
 
+/** Query numbers are clamped; junk or negative values must not reach MongoDB (that was a 500). */
+function boundedInt(raw: unknown, min: number, max: number): number | undefined {
+  if (raw === undefined || raw === '') return undefined;
+  const n = Number.parseInt(String(raw), 10);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(max, Math.max(min, n));
+}
+
 export const getExpenses = async (req: CustomRequest, res: Response) => {
   try {
     const user = req.user_id || '';
@@ -55,8 +63,8 @@ export const getExpenses = async (req: CustomRequest, res: Response) => {
       type: type as 'income' | 'outcome',
       startDate: finalStartDate,
       endDate: finalEndDate,
-      limit: limit ? parseInt(limit as string) : undefined,
-      skip: skip ? parseInt(skip as string) : undefined,
+      limit: boundedInt(limit, 1, 1000),
+      skip: boundedInt(skip, 0, 1_000_000),
     };
 
     const expenses = await ExpenseService.getExpenses(user, filters);
