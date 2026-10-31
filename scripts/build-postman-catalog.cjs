@@ -43,6 +43,46 @@ function commentFor(sourceText, node) {
   return raw.replace(/^\/\*\*?|\*\/|^\s*\/\//gm, '').replace(/^\s*\* ?/gm, '').trim();
 }
 
+// Explicit names where the handler-text heuristic picks the wrong word.
+const SUMMARY_OVERRIDES = {
+  'POST /user/auth/google/exchange': 'Exchange Google OAuth code',
+  'POST /user/auth/google/native': 'Sign in with native Google',
+  'DELETE /user/sessions/{sessionId}': 'Revoke session by id',
+  'GET /user/auth/google/callback': 'Google OAuth callback',
+  'GET /user/google': 'Start Google OAuth',
+  'POST /user/refresh-token': 'Refresh access token',
+  'POST /user/logout': 'Logout',
+  'POST /user/password/forgot': 'Request password reset',
+  'POST /user/password/reset': 'Reset password',
+  'POST /user/biometric/signin': 'Biometric sign in',
+  'POST /user/biometric/enroll': 'Enroll biometric',
+  'DELETE /user/biometric/current': 'Revoke current biometric',
+  'GET /user/access-token': 'Get access token',
+  'GET /user/csrf-token': 'Get CSRF token',
+  'GET /user/sessions': 'List sessions',
+  'DELETE /user/sessions/others': 'Revoke other sessions',
+  'GET /sync/pull': 'Pull sync changes',
+  'POST /sync/push': 'Push sync operations',
+  'POST /sync/bulk': 'Bulk sync',
+  'GET /sync/conflicts': 'List sync conflicts',
+  'POST /sync/conflicts/resolve': 'Resolve sync conflict',
+  'GET /sync/metadata': 'Get sync metadata',
+  'PUT /sync/metadata': 'Update sync metadata',
+  'POST /sync/force-sync': 'Force full sync',
+  'GET /sync/status': 'Get sync status',
+  'DELETE /sync/cleanup': 'Clean up old sync data',
+  'POST /push/devices': 'Register push device',
+  'DELETE /push/devices/{deviceId}': 'Deactivate push device',
+  'POST /plans/upgrade': 'Upgrade plan (self-service)',
+  'PATCH /notifications/all/read': 'Mark all notifications read',
+  'GET /notifications/list': 'List notifications',
+  'GET /notifications/preferences': 'Get notification preferences',
+  'PATCH /notifications/preferences': 'Update notification preferences',
+  'GET /notifications/{notificationId}': 'Get notification',
+  'PATCH /notifications/{notificationId}/read': 'Mark notification read',
+  'POST /notifications/broadcast': 'Broadcast notification (admin)',
+};
+
 function routeSummary(method, route, handlerText) {
   const bound = [...handlerText.matchAll(/([A-Za-z_$][\w$]*)\.bind\(/g)].at(-1)?.[1];
   const plain = handlerText.match(/\b(login|signUp|refreshToken|logout|getMe|updateMe|deleteMe|uploadAvatar|requestPasswordReset|resetPassword|enrollBiometric|biometricSignIn|revokeCurrentBiometric|createExpense|deleteExpense|getExpenseById|getExpenses|getExpenseTotals|updateExpense|createCategory|deleteCategory|getCategories|getCategoryById|updateCategory|updateOrder)\b/)?.[1];
@@ -190,7 +230,7 @@ const requestContracts = {
     note: 'If a new account is created, the backend requires the current legal-consent fields. Existing accounts do not need to resubmit consent.',
   },
   'PUT /user/me': {
-    body: jsonRequest({ phone: string('Phone number.', { example: '+201000000000' }), salary: { oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, amount: { type: 'number' } } } }], description: 'Salary value or labeled salary entries.' }, currency: string('ISO currency code.', { example: 'EGP' }), username: string('Display username.', { example: 'sample-user' }), image: string('Profile image URL/value.', { example: 'https://example.test/avatar.png' }) }, [], { username: 'sample-user', currency: 'EGP' }),
+    body: jsonRequest({ phone: string('Phone number.', { example: '+201000000000' }), salary: { oneOf: [{ type: 'number' }, { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, amount: { type: 'number' } } } }], description: 'Salary value or labeled salary entries.' }, currency: string('ISO currency code.', { example: 'EGP' }), username: string('Display username.', { example: 'Postman QA user' }), image: string('Profile image URL/value.', { example: 'https://example.test/avatar.png' }) }, [], { username: 'Postman QA user', currency: 'EGP' }),
   },
   'POST /user/me/delete': {
     body: jsonRequest({ password: string('Current account password.', { format: 'password', example: '{{currentPassword}}' }), confirmation: string('Explicit account-deletion confirmation phrase.', { example: '{{deletionConfirmation}}' }) }, ['password', 'confirmation'], { password: '{{currentPassword}}', confirmation: '{{deletionConfirmation}}' }),
@@ -1219,7 +1259,7 @@ for (const operation of routeOperations) {
     ...original,
     operationId: original.operationId || `${operation.method}_${operation.file.replace(/\.route\.ts$|\.routes\.ts$/g, '').replace(/[^a-zA-Z0-9]+/g, '_')}_${pathKey.replace(/\W+/g, '_').replace(/^_+|_+$/g, '') || 'root'}`,
     tags: original.tags || [operation.tag],
-    summary: original.summary || operation.summary,
+    summary: SUMMARY_OVERRIDES[routeKey] || original.summary || operation.summary,
     description: detail,
     parameters: [...allParams, ...contractParameters].length
       ? [...allParams, ...contractParameters]

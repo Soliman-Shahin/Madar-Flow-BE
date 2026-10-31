@@ -3,6 +3,11 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 const spec = JSON.parse(fs.readFileSync(path.join(root, 'postman/openapi.json'), 'utf8'));
+const { flow: authFlow, extraRequests: authExtra, order: authOrder } = require('./postman-auth-flow.cjs');
+const authDestructive = new Set(['POST /user/me/delete']);
+const destructiveSkip = ["if (pm.environment.get('allowDestructive') !== 'true') { pm.execution.skipRequest(); }"];
+const { flow: crudFlow, extrasByFolder, orderByFolder, extraFolders } = require('./postman-crud-flow.cjs');
+const itemKeys = new WeakMap();
 const verbs = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options']);
 const folders = new Map();
 const analyticsAssertions = {
@@ -140,6 +145,9 @@ for (const [route, pathItem] of Object.entries(spec.paths)) {
     if (['/user/refresh-token', '/user/logout'].includes(route)) {
       headers.push({ key: 'X-CSRF-Token', value: '{{csrfToken}}' });
     }
+    if (route.startsWith('/user/') && method !== 'get' && !headers.some((h) => h.key === 'X-CSRF-Token')) {
+      headers.push({ key: 'X-CSRF-Token', value: '{{csrfToken}}' });
+    }
     if (usesCookie) headers.push({ key: 'Cookie', value: 'refreshToken={{refreshToken}}' });
     const request = {
       method: method.toUpperCase(),
@@ -154,15 +162,59 @@ for (const [route, pathItem] of Object.entries(spec.paths)) {
           : { mode: 'raw', raw: body.value, options: { raw: { language: 'json' } } } } : {}),
     };
     const key = `${method.toUpperCase()} ${route}`;
-    const testScript = analyticsAssertions[key];
-    folders.get(tag).push({
+    const flowDef = authFlow[key] || crudFlow[key] || (authDestructive.has(key) ? { pre: destructiveSkip } : undefined);
+    if (flowDef?.bodyEmail && request.body?.raw) request.body.raw = request.body.raw.replace(/"email": "[^"]*"/, `"email": "${flowDef.bodyEmail}"`);
+    if (flowDef && request.body?.raw) request.body.raw = request.body.raw.replace('{{password}}', '{{qaPassword}}');
+    if (flowDef?.body && request.body) request.body.raw = flowDef.body;
+    if (flowDef?.token) { request.header = [...request.header.filter((x) => x.key !== 'Authorization'), { key: 'Authorization', value: `Bearer {{${flowDef.token}}}` }]; request.auth = { type: 'noauth' }; }
+    if (flowDef?.urlVars) for (const [from, to] of Object.entries(flowDef.urlVars)) request.url.raw = request.url.raw.split(from).join(to);
+    const testScript = analyticsAssertions[key] || flowDef?.test;
+    const entry = {
       name: operation.summary || operation.operationId || key,
       request,
-      ...(testScript ? { event: [{ listen: 'test', script: { type: 'text/javascript', exec: testScript } }] } : {}),
-    });
+      ...((testScript || flowDef?.pre) ? { event: [...(flowDef?.pre ? [{ listen: 'prerequest', script: { type: 'text/javascript', exec: flowDef.pre } }] : []), ...(testScript ? [{ listen: 'test', script: { type: 'text/javascript', exec: testScript } }] : [])] } : {}),
+    };
+    folders.get(tag).push(entry);
+    itemKeys.set(entry, key);
   }
 }
 
+// Newman cannot parse a raw-only URL (it resolves to an empty URL); add host/path parts like Postman exports.
+function withUrlParts(url) {
+  const raw = url.raw || '';
+  if (!raw.startsWith('{{baseUrl}}') || url.host) return url;
+  const [pathPart, queryPart] = raw.slice('{{baseUrl}}'.length).split('?');
+  // Newman builds the request from the parsed parts, so a query only present in `raw` would be dropped.
+  const query = url.query || (queryPart ? queryPart.split('&').map((pair) => { const i = pair.indexOf('='); return { key: decodeURIComponent(pair.slice(0, i < 0 ? pair.length : i)), value: i < 0 ? '' : pair.slice(i + 1) }; }) : undefined);
+  return { ...url, host: ['{{baseUrl}}'], path: pathPart.split('/').filter(Boolean), ...(query ? { query } : {}) };
+}
+
+for (const extra of authExtra) folders.get('Authentication').push({ name: extra.name, request: extra.request, event: [{ listen: 'test', script: { type: 'text/javascript', exec: extra.test } }] });
+
+{
+  const a = folders.get('Authentication');
+  const rank = (item) => { const k = `${item.request.method} ${item.request.url.raw.replace('{{baseUrl}}', '').replace('{{sessionId}}', '{sessionId}')}`; const i = authOrder.indexOf(k); return i < 0 ? authOrder.length - 1 - 0.5 : i; };
+  a.sort((x, y) => rank(x) - rank(y));
+  // NEGATIVE cases stay last, post-logout check after logout.
+  const neg = a.filter((x) => /^NEGATIVE /.test(x.name)); a.splice(0, a.length, ...a.filter((x) => !/^NEGATIVE /.test(x.name)), ...neg.sort((x, y) => (/after logout/.test(x.name) ? -1 : 0) - (/after logout/.test(y.name) ? -1 : 0)));
+}
+for (const folderName of new Set([...Object.keys(extrasByFolder), ...Object.keys(orderByFolder)])) {
+  const extras = extrasByFolder[folderName] || {};
+  const list = folders.get(folderName);
+  if (!list) continue;
+  const toItem = (x) => ({ name: x.name, request: x.request, event: [{ listen: 'test', script: { type: 'text/javascript', exec: x.test } }] });
+  const rank = (item) => { const i = orderByFolder[folderName].indexOf(itemKeys.get(item)); return i < 0 ? 999 : i; };
+  const core = list.filter((x) => itemKeys.has(x)).sort((a, b) => rank(a) - rank(b));
+  const last = core.pop();
+  list.splice(0, list.length, ...(extras.first || []).map(toItem), ...core, ...(extras.mid || []).map(toItem), last, ...(extras.last || []).map(toItem));
+}
+for (const items of folders.values()) for (const item of items) item.request.url = withUrlParts(item.request.url);
+
+const toFolderItem = (x) => ({ name: x.name, request: { ...x.request, url: withUrlParts(x.request.url) }, event: [...(x.pre ? [{ listen: 'prerequest', script: { type: 'text/javascript', exec: x.pre } }] : []), { listen: 'test', script: { type: 'text/javascript', exec: x.test } }] });
+const staffOrder = ['Staff setup', 'Admin', 'Analytics', 'Admin app settings', 'Audit logs', 'Cache', 'Scopes', 'Rate limits', 'Temporary permissions', 'Permission matrix', 'Roles', 'Staff RBAC'];
+// Consumer folders first (Authentication revokes other sessions), then staff setup + staff folders.
+const allFolders = new Map([...folders, ['Staff setup', extraFolders['Staff setup'].map(toFolderItem)], ['Staff RBAC', extraFolders['Staff RBAC'].map(toFolderItem)]]);
+const orderedFolders = new Map([...[...allFolders].filter(([name]) => !staffOrder.includes(name)), ...staffOrder.filter((name) => allFolders.has(name)).map((name) => [name, allFolders.get(name)])]);
 const collection = {
   info: {
     name: 'Madar Flow REST API',
@@ -184,7 +236,7 @@ const collection = {
       ],
     },
   }],
-  item: [...folders.entries()].map(([name, item]) => ({ name, item })),
+  item: [...orderedFolders.entries()].map(([name, item]) => ({ name, item })),
 };
 fs.writeFileSync(path.join(root, 'postman/collection.json'), JSON.stringify(collection, null, 2) + '\n');
 const count = [...folders.values()].reduce((sum, items) => sum + items.length, 0);

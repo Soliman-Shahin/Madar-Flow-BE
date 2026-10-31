@@ -16,15 +16,15 @@ const operations = Object.entries(spec.paths).flatMap(([route, pathItem]) =>
 const requests = [];
 function collect(items) {
   for (const item of items || []) {
-    if (item.request) requests.push(item);
+    if (item.request && !/^(NEGATIVE|SETUP|CLEANUP) /.test(item.name)) requests.push(item); // NEGATIVE cases are extra assertions, not catalog operations
     else collect(item.item);
   }
 }
 collect(collection.item);
 
 assert.equal(spec.openapi, '3.0.3');
-assert.equal(Object.keys(spec.paths).length, 122, 'mounted route paths changed');
-assert.equal(operations.length, 143, 'mounted route operations changed');
+assert.equal(Object.keys(spec.paths).length, 123, 'mounted route paths changed');
+assert.equal(operations.length, 144, 'mounted route operations changed');
 assert.equal(requests.length, operations.length, 'collection request count differs from spec');
 
 const routeKey = (request) => {
@@ -36,8 +36,10 @@ const routeKey = (request) => {
     .replace(/\{\{([^}]+)\}\}/g, '{$1}');
   return `${request.method.toUpperCase()} ${pathname || '/'}`;
 };
-const requestKeys = requests.map((item) => routeKey(item.request));
-const expectedKeys = new Set(operations.map(([key]) => key));
+// Path-parameter names may be bound to flow variables (e.g. {{categoryId}} for {id}); compare by shape.
+const shape = (key) => key.replace(/{[^}]+}/g, '{}');
+const requestKeys = requests.map((item) => shape(routeKey(item.request)));
+const expectedKeys = new Set(operations.map(([key]) => shape(key)));
 assert.equal(new Set(requestKeys).size, requests.length, 'duplicate collection requests found');
 for (const key of requestKeys) assert(expectedKeys.has(key), `collection request is not in OpenAPI: ${key}`);
 for (const [key, operation] of operations) {
@@ -83,7 +85,7 @@ for (const [key, schema] of Object.entries(detailedContracts)) {
   );
 }
 const testedAnalytics = requests.filter((item) =>
-  Object.keys(detailedContracts).includes(routeKey(item.request))
+  Object.keys(detailedContracts).map(shape).includes(shape(routeKey(item.request)))
 );
 assert.equal(testedAnalytics.length, Object.keys(detailedContracts).length);
 for (const item of testedAnalytics) {
@@ -110,7 +112,7 @@ for (const ref of refs) {
 assert.equal(collection.auth?.type, 'bearer');
 assert.equal(collection.auth?.bearer?.[0]?.value, '{{accessToken}}');
 assert(JSON.stringify(collection.event || []).includes('localhost'));
-assert.equal(collection.item.length, 19, 'collection folder count changed');
+assert.equal(collection.item.filter((f) => !/^Staff (setup|RBAC)$/.test(f.name)).length, 19, 'collection folder count changed');
 const environmentValues = Object.fromEntries(environment.values.map((value) => [value.key, value]));
 assert.equal(environmentValues.baseUrl?.value, 'http://localhost:3000/v1');
 for (const key of ['accessToken', 'refreshToken']) {

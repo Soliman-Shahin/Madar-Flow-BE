@@ -12,7 +12,9 @@
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node\" src/app/server.ts",
     "seed:plans": "ts-node src/app/scripts/seed-plans.ts",
     "seed:admin": "ts-node src/app/scripts/seed-admin.ts",
-    "seed:roles": "ts-node src/app/scripts/seed-roles.ts"
+    "seed:roles": "ts-node src/app/scripts/seed-roles.ts",
+    "seed:test": "ts-node src/app/scripts/seed-test-fixtures.ts",
+    "postman:run": "newman run postman/collection.json -e postman/local-environment.json --ignore-redirects"
   },
   "author": "Orbit Madar",
   "license": "ISC",
@@ -83,6 +85,7 @@
     "eslint-plugin-prettier": "^5.5.6",
     "jest": "^30.4.2",
     "mongodb-memory-server": "^11.2.0",
+    "newman": "^6.2.3",
     "nodemon": "^3.1.14",
     "prettier": "^3.8.4",
     "supertest": "^7.2.2",

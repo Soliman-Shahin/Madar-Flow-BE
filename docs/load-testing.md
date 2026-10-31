@@ -8,7 +8,7 @@ or an overall p95 above `--p95` (default 1500 ms).
 
 **Local or staging only.** It creates real accounts and data and refuses any
 host other than localhost unless `--allow-remote` is passed. Never point it at
-production (production also limits sign-ins to 5 per 15 minutes per IP).
+production (production also rate limits authentication per IP: 20 failed logins and 20 sign-ups/resets per 15 minutes, 60 token refreshes).
 
 ```bash
 npm run build
