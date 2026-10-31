@@ -1,6 +1,5 @@
 import { Expense } from '../models/expense.model';
-import { Category } from '../models/category.model';
-import { BadRequestError } from '../shared/errors';
+import { assertOwnsCategory } from '../shared/ownership';
 import mongoose from 'mongoose';
 import { Request } from 'express';
 import { AuditAction } from '../models/audit-log.model';
@@ -9,19 +8,8 @@ import { safeSearchPattern } from '../shared/search';
 import { auditAndNotifyStaff } from './audit-notifier.service';
 
 export class ExpenseService {
-  /** An expense may only reference a category owned by the same user (populate would otherwise leak it). */
-  private static async assertOwnCategory(categoryId: unknown, userId: string) {
-    if (categoryId === undefined || categoryId === null) return;
-    if (
-      !mongoose.isValidObjectId(categoryId) ||
-      !(await Category.exists({ _id: categoryId as any, user: userId }))
-    ) {
-      throw new BadRequestError('Category not found');
-    }
-  }
-
   static async createExpense(data: any, userId: string, req?: Request) {
-    await this.assertOwnCategory(data?.category, userId);
+    await assertOwnsCategory(data?.category, userId);
     const expense = new Expense({
       ...data,
       user: userId,
@@ -204,7 +192,7 @@ export class ExpenseService {
     userId: string,
     req?: Request
   ) {
-    await this.assertOwnCategory(data?.category, userId);
+    await assertOwnsCategory(data?.category, userId);
     const expense = await Expense.findOne({ _id: id, user: userId });
     if (!expense) return null;
 

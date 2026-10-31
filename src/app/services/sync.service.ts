@@ -1,4 +1,5 @@
 import logger from './logger.service';
+import { assertOwnsCategory } from '../shared/ownership';
 import { Expense } from '../models/expense.model';
 import { Category } from '../models/category.model';
 import { User } from '../models/user.model';
@@ -725,20 +726,8 @@ export class SyncService {
       // move an entity into another account, and a foreign `category` leaks it via populate.
       for (const protectedField of ['user', '_id', '__v'])
         delete entityData[protectedField];
-      if (
-        _entityType !== 'category' &&
-        entityData.category !== undefined &&
-        entityData.category !== null
-      ) {
-        // Pulled expenses carry a populated category object; clients echo it back.
-        const categoryRef =
-          typeof entityData.category === 'object'
-            ? entityData.category._id
-            : entityData.category;
-        const owned =
-          mongoose.Types.ObjectId.isValid(categoryRef) &&
-          (await Category.exists({ _id: categoryRef, user: userId }));
-        if (!owned) throw new Error('Category not found');
+      if (_entityType !== 'category') {
+        await assertOwnsCategory(entityData.category, userId);
       }
       const userObjectId = new mongoose.Types.ObjectId(userId);
       let Model: any;
