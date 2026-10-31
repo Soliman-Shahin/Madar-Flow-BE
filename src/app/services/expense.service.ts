@@ -2,12 +2,11 @@ import { Expense } from '../models/expense.model';
 import { Category } from '../models/category.model';
 import { BadRequestError } from '../shared/errors';
 import mongoose from 'mongoose';
-import { getSocketService } from './socket.service';
 import { Request } from 'express';
-import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import logger from './logger.service';
 import { safeSearchPattern } from '../shared/search';
+import { auditAndNotifyStaff } from './audit-notifier.service';
 
 export class ExpenseService {
   /** An expense may only reference a category owned by the same user (populate would otherwise leak it). */
@@ -15,50 +14,6 @@ export class ExpenseService {
     if (categoryId === undefined || categoryId === null) return;
     if (!mongoose.isValidObjectId(categoryId) || !(await Category.exists({ _id: categoryId as any, user: userId }))) {
       throw new BadRequestError('Category not found');
-    }
-  }
-
-  private static async notifyAndAudit(params: {
-    req?: Request;
-    actorId?: string;
-    action: AuditAction;
-    notification: { title: string; message: string; type: 'info' | 'success' | 'warn' | 'error' };
-    changes?: Record<string, any>;
-    targetUserId?: string;
-    targetResourceType?: string;
-    targetResourceId?: string;
-  }) {
-    let auditLogId: string | undefined;
-
-    try {
-      const auditLog = await auditLogService.log({
-        req: params.req,
-        actorId: params.actorId,
-        action: params.action,
-        targetUserId: params.targetUserId,
-        targetResourceType: params.targetResourceType,
-        targetResourceId: params.targetResourceId,
-        changes: params.changes
-      });
-      auditLogId = auditLog._id.toString();
-    } catch (err) {
-      logger.error('Failed to log audit event in notifyAndAudit', err as Error);
-    }
-
-    try {
-      const socketService = getSocketService();
-      socketService.broadcastToStaff({
-        title: params.notification.title,
-        message: params.notification.message,
-        type: params.notification.type,
-        action: params.action,
-        actor: { id: params.actorId },
-        resource: { type: params.targetResourceType, id: params.targetResourceId, name: params.targetResourceType },
-        changes: params.changes,
-        auditLogId: auditLogId
-      });
-    } catch (err) {
-      logger.error('Failed to broadcast socket notification in notifyAndAudit', err as Error);
     }
   }
 
@@ -74,7 +29,7 @@ export class ExpenseService {
     });
     const saved = await expense.save();
 
-    await this.notifyAndAudit({
+    await auditAndNotifyStaff({
       req,
       actorId: userId,
       action: AuditAction.EXPENSE_CREATED,
@@ -258,7 +213,7 @@ export class ExpenseService {
       { returnDocument: 'after', runValidators: true }
     ).populate('category');
 
-    await this.notifyAndAudit({
+    await auditAndNotifyStaff({
       req,
       actorId: userId,
       action: AuditAction.EXPENSE_UPDATED,
@@ -288,7 +243,7 @@ export class ExpenseService {
       { returnDocument: 'after' }
     );
 
-    await this.notifyAndAudit({
+    await auditAndNotifyStaff({
       req,
       actorId: userId,
       action: AuditAction.EXPENSE_DELETED,

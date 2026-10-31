@@ -1,58 +1,13 @@
 import { Category } from '../models/category.model';
 import { Types } from 'mongoose';
 import { cacheService } from './cache.service';
-import { getSocketService } from './socket.service';
 import { Request } from 'express';
-import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import logger from './logger.service';
 import { safeSearchPattern, safeSortField } from '../shared/search';
+import { auditAndNotifyStaff } from './audit-notifier.service';
 
 export class CategoryService {
-  private static async notifyAndAudit(params: {
-    req?: Request;
-    actorId?: string;
-    action: AuditAction;
-    notification: { title: string; message: string; type: 'info' | 'success' | 'warn' | 'error' };
-    changes?: Record<string, any>;
-    targetUserId?: string;
-    targetResourceType?: string;
-    targetResourceId?: string;
-  }) {
-    let auditLogId: string | undefined;
-
-    try {
-      const auditLog = await auditLogService.log({
-        req: params.req,
-        actorId: params.actorId,
-        action: params.action,
-        targetUserId: params.targetUserId,
-        targetResourceType: params.targetResourceType,
-        targetResourceId: params.targetResourceId,
-        changes: params.changes
-      });
-      auditLogId = auditLog._id.toString();
-    } catch (err) {
-      logger.error('Failed to log audit event in notifyAndAudit', err as Error);
-    }
-
-    try {
-      const socketService = getSocketService();
-      socketService.broadcastToStaff({
-        title: params.notification.title,
-        message: params.notification.message,
-        type: params.notification.type,
-        action: params.action,
-        actor: { id: params.actorId },
-        resource: { type: params.targetResourceType, id: params.targetResourceId, name: params.targetResourceType },
-        changes: params.changes,
-        auditLogId: auditLogId
-      });
-    } catch (err) {
-      logger.error('Failed to broadcast socket notification in notifyAndAudit', err as Error);
-    }
-  }
-
   static clearUserCategoryCache(userId: string) {
     cacheService.delByPrefix(`categories:${userId}`);
   }
@@ -69,7 +24,7 @@ export class CategoryService {
     const result = await category.save();
     this.clearUserCategoryCache(userId);
 
-    await this.notifyAndAudit({
+    await auditAndNotifyStaff({
       req,
       actorId: userId,
       action: AuditAction.CATEGORY_CREATED,
@@ -154,7 +109,7 @@ export class CategoryService {
     );
     this.clearUserCategoryCache(userId);
 
-    await this.notifyAndAudit({
+    await auditAndNotifyStaff({
       req,
       actorId: userId,
       action: AuditAction.CATEGORY_UPDATED,
@@ -195,7 +150,7 @@ export class CategoryService {
     );
     this.clearUserCategoryCache(userId);
 
-    await this.notifyAndAudit({
+    await auditAndNotifyStaff({
       req,
       actorId: userId,
       action: AuditAction.CATEGORY_DELETED,

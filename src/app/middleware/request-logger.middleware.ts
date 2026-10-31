@@ -52,7 +52,7 @@ export const requestLogger = (
   const originalEnd = res.end;
 
   // Override end function to log response
-  res.end = function (chunk?: any, encoding?: any, callback?: any): Response {
+  res.end = function (this: Response, ...endArgs: any[]): Response {
     // Calculate duration
     const duration = Date.now() - startTime;
 
@@ -85,7 +85,7 @@ export const requestLogger = (
     }
 
     // Call original end function
-    return originalEnd.apply(this, Array.from(arguments) as any);
+    return originalEnd.apply(this, endArgs as any);
   };
 
   next();

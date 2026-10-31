@@ -13,11 +13,10 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { ConflictError, NotFoundError } from '../shared/errors';
 import { UserService } from './user.service';
-import { getSocketService } from './socket.service';
 import { Request } from 'express';
-import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import { safeSearchPattern, safeSortField } from '../shared/search';
+import { auditAndNotifyStaff } from './audit-notifier.service';
 
 /** Credentials and one-time-token hashes that must never leave the server, even to staff. */
 const PRIVATE_USER_FIELDS = [
@@ -54,69 +53,6 @@ export interface SyncTrendDay {
  * Bypasses user-scoped logic found in regular services.
  */
 export class AdminService {
-  private async notifyAndAudit(params: {
-    req?: Request;
-    actorId?: string;
-    actorEmail?: string;
-    actorRole?: UserRole;
-    action: AuditAction;
-    notification: {
-      title: string;
-      message: string;
-      type: 'info' | 'success' | 'warn' | 'error';
-    };
-    changes?: Record<string, any>;
-    targetUserId?: string;
-    targetResourceType?: string;
-    targetResourceId?: string;
-  }) {
-    let auditLogId: string | undefined;
-
-    try {
-      const auditLog = await auditLogService.log({
-        req: params.req,
-        actorId: params.actorId,
-        actorEmail: params.actorEmail,
-        actorRole: params.actorRole,
-        action: params.action,
-        targetUserId: params.targetUserId,
-        targetResourceType: params.targetResourceType,
-        targetResourceId: params.targetResourceId,
-        changes: params.changes,
-      });
-      auditLogId = auditLog._id.toString();
-    } catch (err) {
-      logger.error('Failed to log audit event in notifyAndAudit', err as Error);
-    }
-
-    try {
-      const socketService = getSocketService();
-      socketService.broadcastToStaff({
-        title: params.notification.title,
-        message: params.notification.message,
-        type: params.notification.type,
-        action: params.action,
-        actor: {
-          id: params.actorId,
-          email: params.actorEmail,
-          role: params.actorRole,
-        },
-        resource: {
-          type: params.targetResourceType,
-          id: params.targetResourceId,
-          name: params.targetResourceType,
-        },
-        changes: params.changes,
-        auditLogId: auditLogId,
-      });
-    } catch (err) {
-      logger.error(
-        'Failed to broadcast socket notification in notifyAndAudit',
-        err as Error
-      );
-    }
-  }
-
   /**
    * Get global system statistics
    */
@@ -294,7 +230,7 @@ export class AdminService {
         logger.debug(`Invalidated permission cache for user ${userId}`);
       }
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         actorRole,
         action: AuditAction.USER_UPDATED,
@@ -337,7 +273,7 @@ export class AdminService {
         { _isDeleted: true }
       );
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         actorRole,
         action: AuditAction.USER_DELETED,
@@ -379,7 +315,7 @@ export class AdminService {
         { _isDeleted: false }
       );
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         actorRole,
         action: AuditAction.USER_RESTORED,
@@ -437,7 +373,7 @@ export class AdminService {
       delete (userObj as any).password;
       delete (userObj as any).sessions;
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         actorRole,
         action: AuditAction.USER_CREATED,
@@ -576,7 +512,7 @@ export class AdminService {
       Object.assign(category, safeUpdate);
       await category.save();
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         action: AuditAction.CATEGORY_UPDATED,
         notification: {
@@ -616,7 +552,7 @@ export class AdminService {
         { $set: { _isDeleted: true } }
       );
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         action: AuditAction.CATEGORY_DELETED,
         notification: {
@@ -651,7 +587,7 @@ export class AdminService {
         { _isDeleted: false }
       );
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         action: AuditAction.CATEGORY_RESTORED,
         notification: {
@@ -694,7 +630,7 @@ export class AdminService {
       });
       await category.save();
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         action: AuditAction.CATEGORY_CREATED,
         notification: {
@@ -796,7 +732,7 @@ export class AdminService {
       expense._isDeleted = true;
       await expense.save();
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         action: AuditAction.EXPENSE_DELETED,
         notification: {
@@ -826,7 +762,7 @@ export class AdminService {
       expense._isDeleted = false;
       await expense.save();
 
-      await this.notifyAndAudit({
+      await auditAndNotifyStaff({
         req,
         action: AuditAction.EXPENSE_RESTORED,
         notification: {
