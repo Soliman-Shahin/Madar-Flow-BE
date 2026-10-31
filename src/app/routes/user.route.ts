@@ -33,6 +33,8 @@ import { loginSchema, signUpSchema } from '../validations/user.validation';
 import multer from 'multer';
 import {
   strictAuthRateLimiter,
+  loginRateLimiter,
+  sessionRateLimiter,
   biometricAuthRateLimiter,
 } from '../middleware/rate-limit.middleware';
 import {
@@ -196,13 +198,13 @@ router.post(
  */
 router.post(
   '/login',
-  strictAuthRateLimiter,
+  loginRateLimiter,
   checkBruteForce,
   validateRequestWithZod(loginSchema),
   login
 );
-router.post('/refresh-token', strictAuthRateLimiter, refreshToken);
-router.post('/logout', strictAuthRateLimiter, logout);
+router.post('/refresh-token', sessionRateLimiter, refreshToken);
+router.post('/logout', sessionRateLimiter, logout);
 router.get('/csrf-token', issueCsrfToken);
 router.get('/sessions', verifyAccessToken, async (req: Request, res: Response) => {
   const auth = req as AuthenticatedRequest;

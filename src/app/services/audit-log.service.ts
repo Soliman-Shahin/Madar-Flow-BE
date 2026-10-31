@@ -2,6 +2,7 @@ import { Request } from 'express';
 import { AuditLog, AuditAction, AuditSeverity, IAuditLog } from '../models/audit-log.model';
 import { UserRole } from '../models/user.model';
 import logger from './logger.service';
+import { redactSensitive } from '../shared/redact';
 
 /**
  * Audit Log Service
@@ -56,8 +57,8 @@ class AuditLogService {
         targetRole: params.targetRole,
         targetResourceType: params.targetResourceType,
         targetResourceId: params.targetResourceId,
-        changes: params.changes,
-        metadata: params.metadata,
+        changes: redactSensitive(params.changes),
+        metadata: redactSensitive(params.metadata),
         ipAddress,
         userAgent,
         requestPath,

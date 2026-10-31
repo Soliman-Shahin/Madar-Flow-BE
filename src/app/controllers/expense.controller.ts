@@ -12,7 +12,7 @@ export const createExpense = async (req: CustomRequest, res: Response) => {
   try {
     const user = req.user_id || '';
     const expense = await ExpenseService.createExpense(req.body, user, req);
-    sendSuccess(res, expense, 'Expense created successfully');
+    sendSuccess(res, expense, 'Expense created successfully', 201);
   } catch (error: any) {
     // Propagate AppError subclasses (PlanLimitError, etc.) with correct status code
     if (error instanceof AppError) {

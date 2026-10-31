@@ -1,3 +1,4 @@
+import { BadRequestError, ConflictError, NotFoundError } from '../shared/errors';
 import mongoose from 'mongoose';
 import { TemporaryPermission, ITemporaryPermission } from '../models/temporary-permission.model';
 import { Permission } from '../types/permissions.types';
@@ -38,11 +39,11 @@ class TemporaryPermissionService {
 
       // Validate dates
       if (endDate <= startDate) {
-        throw new Error('End date must be after start date');
+        throw new BadRequestError('End date must be after start date');
       }
 
       if (endDate <= new Date()) {
-        throw new Error('End date must be in the future');
+        throw new BadRequestError('End date must be in the future');
       }
 
       // Create temporary permission
@@ -100,11 +101,11 @@ class TemporaryPermissionService {
       const tempPermission = await TemporaryPermission.findById(tempPermissionId);
 
       if (!tempPermission) {
-        throw new Error('Temporary permission not found');
+        throw new NotFoundError('Temporary permission');
       }
 
       if (!tempPermission.isActive) {
-        throw new Error('Permission is already revoked');
+        throw new ConflictError('Permission is already revoked');
       }
 
       // Revoke the permission
@@ -264,15 +265,15 @@ class TemporaryPermissionService {
       const tempPermission = await TemporaryPermission.findById(tempPermissionId);
 
       if (!tempPermission) {
-        throw new Error('Temporary permission not found');
+        throw new NotFoundError('Temporary permission');
       }
 
       if (!tempPermission.isActive) {
-        throw new Error('Cannot extend inactive permission');
+        throw new ConflictError('Cannot extend inactive permission');
       }
 
       if (newEndDate <= tempPermission.endDate) {
-        throw new Error('New end date must be after current end date');
+        throw new BadRequestError('New end date must be after current end date');
       }
 
       const oldEndDate = tempPermission.endDate;

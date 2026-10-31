@@ -3,6 +3,7 @@ import { Server, Socket } from 'socket.io';
 import logger from './logger.service';
 import jwt from 'jsonwebtoken';
 import { corsOptions } from '../config/corsConfig';
+import { User } from '../models/user.model';
 
 export interface RichNotification {
   id?: string;
@@ -32,22 +33,7 @@ export class SocketService {
   private initialize() {
     // Middleware for authentication
     this.io.use((socket, next) => {
-      const token = socket.handshake.auth.token;
-
-      if (!token) {
-        return next(new Error('Authentication error: Token missing'));
-      }
-
-      try {
-        const decoded = jwt.verify(
-          token,
-          process.env.ACCESS_TOKEN_SECRET as string
-        );
-        (socket as any).user = decoded; // Store user data in socket
-        next();
-      } catch (err) {
-        next(new Error('Authentication error: Invalid token'));
-      }
+      void this.authenticate(socket, next);
     });
 
     this.io.on('connection', (socket: Socket) => {
@@ -69,6 +55,40 @@ export class SocketService {
     });
   }
 
+  /**
+   * Same trust rules as the HTTP access middleware: a valid JWT is not enough, the account must
+   * still be active and the session id must still be live. Role comes from the database because
+   * access tokens only carry { _id, sid }.
+   */
+  private async authenticate(socket: Socket, next: (err?: Error) => void) {
+    const token = socket.handshake.auth?.token;
+    if (!token || typeof token !== 'string') {
+      return next(new Error('Authentication error: Token missing'));
+    }
+    try {
+      const payload = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET as string, {
+        algorithms: ['HS256'],
+      }) as any;
+      if (typeof payload?._id !== 'string' || typeof payload?.sid !== 'string') {
+        throw new Error('bad payload');
+      }
+      const doc = await User.findById(payload._id)
+        .select('isActive _isDeleted role sessions')
+        .lean();
+      const now = Math.floor(Date.now() / 1000);
+      const live =
+        doc &&
+        !doc._isDeleted &&
+        doc.isActive !== false &&
+        doc.sessions?.some((session) => session.sessionId === payload.sid && session.expiresAt > now);
+      if (!live) throw new Error('inactive');
+      (socket as any).user = { id: String(doc!._id), role: doc!.role };
+      next();
+    } catch {
+      next(new Error('Authentication error: Invalid token'));
+    }
+  }
+
   // Method to broadcast a notification to all connected clients
   // or specific roles
   public broadcastNotification(notification: RichNotification, role?: string) {
@@ -85,6 +105,13 @@ export class SocketService {
       this.io.emit('ReceiveNotification', enrichedNotification);
     }
     logger.info(`[Socket.io] Broadcasted notification: ${notification.title}`);
+  }
+
+  /** Operational/audit events: only staff dashboards should ever see them. */
+  public broadcastToStaff(notification: RichNotification) {
+    for (const role of ['moderator', 'admin', 'superadmin']) {
+      this.broadcastNotification(notification, role);
+    }
   }
 
   public sendNotificationToUser(

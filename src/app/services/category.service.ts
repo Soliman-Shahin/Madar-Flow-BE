@@ -6,7 +6,7 @@ import { Request } from 'express';
 import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
 import logger from './logger.service';
-import { safeSearchPattern } from '../shared/search';
+import { safeSearchPattern, safeSortField } from '../shared/search';
 
 export class CategoryService {
   private static async notifyAndAudit(params: {
@@ -38,7 +38,7 @@ export class CategoryService {
 
     try {
       const socketService = getSocketService();
-      socketService.broadcastNotification({
+      socketService.broadcastToStaff({
         title: params.notification.title,
         message: params.notification.message,
         type: params.notification.type,
@@ -100,8 +100,9 @@ export class CategoryService {
     const titlePattern = safeSearchPattern(q);
     if (titlePattern) filter.title = { $regex: titlePattern, $options: 'i' };
     if (type) filter.type = type;
-    const sortField = sort.startsWith('-') ? sort.substring(1) : sort;
-    const sortOrder = sort.startsWith('-') ? -1 : 1;
+    const sortText: string = typeof sort === 'string' ? sort : 'order';
+    const sortField = safeSortField(sortText.startsWith('-') ? sortText.substring(1) : sortText, 'order', ['order','title','type','createdAt','updatedAt','isDefault']);
+    const sortOrder = sortText.startsWith('-') ? -1 : 1;
     const sortObj: Record<string, 1 | -1> = {
       [sortField]: sortOrder as 1 | -1,
     };

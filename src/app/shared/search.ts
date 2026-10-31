@@ -13,3 +13,20 @@ export function safeSearchPattern(raw: unknown): string | null {
   if (!trimmed) return null;
   return trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+const SORT_FIELD_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const SECRET_SORT_FIELDS = /password|session|token|hash|secret|salary/i;
+
+/**
+ * Client-supplied sort keys must never reach `.sort()` unchecked: `$`-operators crash the query
+ * (500) and sorting by a secret field (password hash, session tokens) leaks its ordering.
+ * With `allowed`, only listed fields pass; without it, only plain identifiers that do not look
+ * secret. Anything else falls back to the default sort.
+ */
+export function safeSortField(raw: unknown, fallback: string, allowed?: readonly string[]): string {
+  if (typeof raw !== 'string' || !SORT_FIELD_PATTERN.test(raw) || SECRET_SORT_FIELDS.test(raw)) {
+    return fallback;
+  }
+  if (allowed && !allowed.includes(raw)) return fallback;
+  return raw;
+}

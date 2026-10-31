@@ -1,4 +1,6 @@
 import { Expense } from '../models/expense.model';
+import { Category } from '../models/category.model';
+import { BadRequestError } from '../shared/errors';
 import mongoose from 'mongoose';
 import { getSocketService } from './socket.service';
 import { Request } from 'express';
@@ -8,6 +10,14 @@ import logger from './logger.service';
 import { safeSearchPattern } from '../shared/search';
 
 export class ExpenseService {
+  /** An expense may only reference a category owned by the same user (populate would otherwise leak it). */
+  private static async assertOwnCategory(categoryId: unknown, userId: string) {
+    if (categoryId === undefined || categoryId === null) return;
+    if (!mongoose.isValidObjectId(categoryId) || !(await Category.exists({ _id: categoryId as any, user: userId }))) {
+      throw new BadRequestError('Category not found');
+    }
+  }
+
   private static async notifyAndAudit(params: {
     req?: Request;
     actorId?: string;
@@ -37,7 +47,7 @@ export class ExpenseService {
 
     try {
       const socketService = getSocketService();
-      socketService.broadcastNotification({
+      socketService.broadcastToStaff({
         title: params.notification.title,
         message: params.notification.message,
         type: params.notification.type,
@@ -53,6 +63,7 @@ export class ExpenseService {
   }
 
   static async createExpense(data: any, userId: string, req?: Request) {
+    await this.assertOwnCategory(data?.category, userId);
     const expense = new Expense({
       ...data,
       user: userId,
@@ -230,6 +241,7 @@ export class ExpenseService {
   }
 
   static async updateExpense(id: string, data: any, userId: string, req?: Request) {
+    await this.assertOwnCategory(data?.category, userId);
     const expense = await Expense.findOne({ _id: id, user: userId });
     if (!expense) return null;
 

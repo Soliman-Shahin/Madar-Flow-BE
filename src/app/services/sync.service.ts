@@ -605,6 +605,17 @@ export class SyncService {
         }
       }
 
+      // Never trust ownership/identity fields from the client: `user` would let a caller
+      // move an entity into another account, and a foreign `category` leaks it via populate.
+      for (const protectedField of ['user', '_id', '__v']) delete entityData[protectedField];
+      if (_entityType !== 'category' && entityData.category !== undefined && entityData.category !== null) {
+        // Pulled expenses carry a populated category object; clients echo it back.
+        const categoryRef =  typeof entityData.category === 'object' ? entityData.category._id : entityData.category;
+        const owned =
+          mongoose.Types.ObjectId.isValid(categoryRef) &&
+          (await Category.exists({ _id: categoryRef, user: userId }));
+        if (!owned) throw new Error('Category not found');
+      }
       const userObjectId = new mongoose.Types.ObjectId(userId);
       let Model: any;
 

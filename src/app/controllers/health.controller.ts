@@ -163,16 +163,28 @@ export const basicHealthCheck = async (req: Request, res: Response) => {
 };
 
 /**
- * Detailed health check endpoint (comprehensive)
+ * Public health summary used by clients (the Mobile app polls it to detect backend reachability).
+ * It exposes only the overall status: no version, environment, timings or memory details.
  * GET /health/detailed
  */
 export const detailedHealthCheck = async (req: Request, res: Response) => {
   try {
     const health = await performHealthChecks();
-
-    // Return 503 if unhealthy, 200 otherwise
     const statusCode = health.status === 'unhealthy' ? 503 : 200;
+    return res.status(statusCode).json({ status: health.status, timestamp: health.timestamp });
+  } catch (error: any) {
+    return sendError(res, 'Health check failed', 500, 'HEALTH_CHECK_FAILED');
+  }
+};
 
+/**
+ * Full diagnostics (version, environment, database timing, memory). Staff only.
+ * GET /health/diagnostics
+ */
+export const diagnosticsHealthCheck = async (req: Request, res: Response) => {
+  try {
+    const health = await performHealthChecks();
+    const statusCode = health.status === 'unhealthy' ? 503 : 200;
     return res.status(statusCode).json(health);
   } catch (error: any) {
     return sendError(res, error.message, 500, 'HEALTH_CHECK_FAILED');
@@ -224,6 +236,7 @@ export const livenessCheck = async (req: Request, res: Response) => {
 export default {
   basicHealthCheck,
   detailedHealthCheck,
+  diagnosticsHealthCheck,
   readinessCheck,
   livenessCheck,
 };

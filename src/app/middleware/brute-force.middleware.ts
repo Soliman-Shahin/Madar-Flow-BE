@@ -113,7 +113,11 @@ class BruteForceProtection {
   public checkBeforeAuth() {
     return async (req: Request, res: Response, next: NextFunction) => {
       const ip = this.getIp(req);
-      const email = req.body?.email?.toLowerCase();
+      // Runs before schema validation, so the value may be an object or array (operator
+      // injection attempt); only strings are tracked, the validator rejects the rest.
+      const rawEmail = req.body?.email;
+      const email =
+        typeof rawEmail === 'string' ? rawEmail.toLowerCase() : undefined;
       const now = Date.now();
 
       // Check IP-based lockout

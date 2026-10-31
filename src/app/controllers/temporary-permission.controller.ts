@@ -1,3 +1,4 @@
+import { AppError } from '../shared/errors';
 import { Request, Response } from 'express';
 import { temporaryPermissionService } from '../services/temporary-permission.service';
 import { Permission } from '../types/permissions.types';
@@ -58,6 +59,9 @@ class TemporaryPermissionController {
       );
     } catch (error: any) {
       logger.error('Error granting temporary permission:', error.message);
+      if (error instanceof AppError) {
+        return sendError(res, error.message, error.statusCode, error.code);
+      }
       sendError(res, error.message, 500, 'INTERNAL_ERROR');
     }
   }
@@ -88,6 +92,9 @@ class TemporaryPermissionController {
       sendSuccess(res, tempPermission, 'Temporary permission revoked successfully');
     } catch (error: any) {
       logger.error('Error revoking temporary permission:', error.message);
+      if (error instanceof AppError) {
+        return sendError(res, error.message, error.statusCode, error.code);
+      }
       sendError(res, error.message, 500, 'INTERNAL_ERROR');
     }
   }
@@ -128,6 +135,9 @@ class TemporaryPermissionController {
       sendSuccess(res, tempPermission, 'Temporary permission extended successfully');
     } catch (error: any) {
       logger.error('Error extending temporary permission:', error.message);
+      if (error instanceof AppError) {
+        return sendError(res, error.message, error.statusCode, error.code);
+      }
       sendError(res, error.message, 500, 'INTERNAL_ERROR');
     }
   }

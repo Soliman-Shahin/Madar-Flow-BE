@@ -81,6 +81,16 @@ class RateLimiter {
       // Increment count
       record.count++;
 
+      // Optionally refund the slot once the outcome is known (e.g. only failed logins count).
+      if (this.config.skipSuccessfulRequests || this.config.skipFailedRequests) {
+        res.on('finish', () => {
+          const ok = res.statusCode < 400;
+          const refund =
+            (ok && this.config.skipSuccessfulRequests) || (!ok && this.config.skipFailedRequests);
+          if (refund && this.store[key] === record && record.count > 0) record.count--;
+        });
+      }
+
       // Set rate limit headers
       const remaining = Math.max(0, this.config.maxRequests - record.count);
       const resetTime = Math.ceil(record.resetTime / 1000);
@@ -126,8 +136,30 @@ export function createRateLimiter(config: RateLimitConfig) {
  */
 export const strictAuthRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  maxRequests: process.env.NODE_ENV === 'production' ? 5 : 100,
+  maxRequests: process.env.NODE_ENV === 'production' ? 20 : 100,
   message: 'Too many authentication attempts, please try again later',
+});
+
+/**
+ * Login limiter: only failed attempts consume the budget, so users sharing a NAT/mobile
+ * carrier IP are not locked out by each other's successful sign-ins. Per-email+IP brute-force
+ * protection (checkBruteForce) remains the targeted guard against password guessing.
+ */
+export const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: process.env.NODE_ENV === 'production' ? 20 : 100,
+  skipSuccessfulRequests: true,
+  message: 'Too many authentication attempts, please try again later',
+});
+
+/**
+ * Session maintenance (refresh-token, logout). Separate counter so routine token refreshes
+ * never exhaust the login budget.
+ */
+export const sessionRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: process.env.NODE_ENV === 'production' ? 60 : 100,
+  message: 'Too many session requests, please try again later',
 });
 export const biometricAuthRateLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
@@ -168,6 +200,8 @@ export const veryStrictRateLimiter = createRateLimiter({
 export default {
   createRateLimiter,
   strictAuthRateLimiter,
+  loginRateLimiter,
+  sessionRateLimiter,
   biometricAuthRateLimiter,
   standardRateLimiter,
   lenientRateLimiter,

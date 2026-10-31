@@ -10,6 +10,14 @@ import {
 import { User, Category } from '../models';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '../services/password-validation.service';
+
+/** Auth responses expose the account, not storage internals (`__v`, soft-delete flag). */
+function publicAuthUser(user: any) {
+  const plain = typeof user?.toJSON === 'function' ? user.toJSON() : { ...user };
+  delete plain.__v;
+  delete plain._isDeleted;
+  return plain;
+}
 import {
   recordFailedLogin,
   resetLoginAttempts,
@@ -114,7 +122,7 @@ const signUp = async (req: CustomRequest, res: Response) => {
 
     sendSuccess(
       res,
-      { user, accessToken, ...(!cookieAuth ? { refreshToken } : {}) },
+      { user: publicAuthUser(user), accessToken, ...(!cookieAuth ? { refreshToken } : {}) },
       'Signup successful'
     );
   } catch (error: unknown) {
@@ -173,7 +181,7 @@ const login = async (req: CustomRequest, res: Response) => {
 
     sendSuccess(
       res,
-      { user, accessToken, ...(!cookieAuth ? { refreshToken } : {}) },
+      { user: publicAuthUser(user), accessToken, ...(!cookieAuth ? { refreshToken } : {}) },
       'Login successful'
     );
   } catch (error: unknown) {

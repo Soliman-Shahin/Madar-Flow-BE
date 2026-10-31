@@ -42,6 +42,9 @@ describe('signup', () => {
     const res = await post('/signup', { email: 'new@example.test', password: STRONG, ...consent }, ip);
     expect(res.status).toBe(200);
     expect(res.body.data.user.password).toBeUndefined();
+    // D-004: no storage internals in auth responses
+    expect(res.body.data.user.__v).toBeUndefined();
+    expect(res.body.data.user._isDeleted).toBeUndefined();
 
     const saved = await User.findOne({ email: 'new@example.test' });
     expect(saved!.password).not.toBe(STRONG);

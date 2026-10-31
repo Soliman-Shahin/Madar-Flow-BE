@@ -190,4 +190,14 @@ describe('sync conflict resolution HTTP boundary', () => {
       })
     ).toBe(0);
   });
+
+  it('answers 404 SYNC_CONFLICT_NOT_FOUND (not 500) when there is no open conflict', async () => {
+    const { token, expense } = await createFixture();
+    const res = await request(app)
+      .post('/v1/sync/conflicts/resolve')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ entityId: String(expense._id), entityType: 'expense', resolution: 'server' });
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('SYNC_CONFLICT_NOT_FOUND');
+  });
 });

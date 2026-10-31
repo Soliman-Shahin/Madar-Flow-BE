@@ -11,13 +11,31 @@ import logger from './logger.service';
 import { permissionCacheService } from './permission-cache.service';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { ConflictError } from '../shared/errors';
+import { ConflictError, NotFoundError } from '../shared/errors';
 import { UserService } from './user.service';
 import { getSocketService } from './socket.service';
 import { Request } from 'express';
 import { auditLogService } from './audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
-import { safeSearchPattern } from '../shared/search';
+import { safeSearchPattern, safeSortField } from '../shared/search';
+
+/** Credentials and one-time-token hashes that must never leave the server, even to staff. */
+const PRIVATE_USER_FIELDS = [
+  'password',
+  'sessions',
+  'passwordResetTokenHash',
+  'passwordResetExpiresAt',
+  'passwordResetRequestedAt',
+  'accountDeletionTokenHash',
+  'accountDeletionExpiresAt',
+] as const;
+const PRIVATE_USER_PROJECTION = PRIVATE_USER_FIELDS.map((field) => `-${field}`).join(' ');
+
+function stripPrivateUserFields<T extends Record<string, any>>(user: T): T {
+  const copy: Record<string, any> = { ...user };
+  for (const field of PRIVATE_USER_FIELDS) delete copy[field];
+  return copy as T;
+}
 
 export interface SyncTrendDay {
   date: string;
@@ -73,7 +91,7 @@ export class AdminService {
 
     try {
       const socketService = getSocketService();
-      socketService.broadcastNotification({
+      socketService.broadcastToStaff({
         title: params.notification.title,
         message: params.notification.message,
         type: params.notification.type,
@@ -140,6 +158,7 @@ export class AdminService {
     sortField: string = 'createdAt',
     sortOrder: number = -1
   ) {
+    sortField = safeSortField(sortField, 'createdAt', ['createdAt','updatedAt','email','role','plan','isActive','_isDeleted','emailVerified']);
     try {
       const query: any = {};
 
@@ -166,6 +185,7 @@ export class AdminService {
 
       const [users, total] = await Promise.all([
         User.find(query)
+          .select(PRIVATE_USER_PROJECTION)
           .sort({ [sortField]: sortOrder as 1 | -1 })
           .skip(skip)
           .limit(limit)
@@ -193,8 +213,10 @@ export class AdminService {
    */
   async getUserById(userId: string) {
     try {
-      const user = await User.findById(userId).lean();
-      if (!user) throw new Error('User not found');
+      const user = await User.findById(userId)
+        .select(PRIVATE_USER_PROJECTION)
+        .lean();
+      if (!user) throw new NotFoundError('User');
 
       const stats = await Expense.aggregate([
         { $match: { user: user._id } },
@@ -229,7 +251,7 @@ export class AdminService {
   ) {
     try {
       const userToUpdate = await User.findById(userId);
-      if (!userToUpdate) throw new Error('User not found');
+      if (!userToUpdate) throw new NotFoundError('User');
 
       if (!canManageTargetRole(actorRole, userToUpdate.role as UserRole)) {
         throw new Error('You do not have permission to modify this user');
@@ -287,7 +309,7 @@ export class AdminService {
         targetResourceId: userToUpdate._id.toString(),
       });
 
-      return userToUpdate.toObject();
+      return stripPrivateUserFields(userToUpdate.toObject());
     } catch (error) {
       logger.error('Error updating user:', error as Error);
       throw error;
@@ -300,7 +322,7 @@ export class AdminService {
   async deleteUser(actorRole: UserRole, userId: string, req?: Request) {
     try {
       const user = await User.findById(userId);
-      if (!user) throw new Error('User not found');
+      if (!user) throw new NotFoundError('User');
 
       if (!canManageTargetRole(actorRole, user.role as UserRole)) {
         throw new Error('You do not have permission to delete this user');
@@ -342,7 +364,7 @@ export class AdminService {
   async restoreUser(actorRole: UserRole, userId: string, req?: Request) {
     try {
       const user = await User.findById(userId);
-      if (!user) throw new Error('User not found');
+      if (!user) throw new NotFoundError('User');
 
       if (!canManageTargetRole(actorRole, user.role as UserRole)) {
         throw new Error('You do not have permission to restore this user');
@@ -448,6 +470,7 @@ export class AdminService {
     sortField: string = 'createdAt',
     sortOrder: number = -1
   ) {
+    sortField = safeSortField(sortField, 'createdAt', ['createdAt','updatedAt','title','type','isDefault','isActive','order','_isDeleted']);
     try {
       const query: any = {};
 
@@ -503,7 +526,7 @@ export class AdminService {
       const category = await Category.findById(categoryId)
         .populate('user', 'email username')
         .lean();
-      if (!category) throw new Error('Category not found');
+      if (!category) throw new NotFoundError('Category');
 
       // Get stats for this category across all users
       const stats = await Expense.aggregate([
@@ -537,7 +560,7 @@ export class AdminService {
   ) {
     try {
       const category = await Category.findById(categoryId);
-      if (!category) throw new Error('Category not found');
+      if (!category) throw new NotFoundError('Category');
 
       const ALLOWED_FIELDS = ['title', 'icon', 'color', 'type', 'isActive'];
       const safeUpdate: Record<string, any> = {};
@@ -579,10 +602,10 @@ export class AdminService {
   async deleteCategory(categoryId: string, req?: Request) {
     try {
       const category = await Category.findById(categoryId);
-      if (!category) throw new Error('Category not found');
+      if (!category) throw new NotFoundError('Category');
 
       if (category.isDefault) {
-        throw new Error('Cannot delete a system default category');
+        throw new ConflictError('Cannot delete a system default category');
       }
 
       category._isDeleted = true;
@@ -618,7 +641,7 @@ export class AdminService {
   async restoreCategory(categoryId: string, req?: Request) {
     try {
       const category = await Category.findById(categoryId);
-      if (!category) throw new Error('Category not found');
+      if (!category) throw new NotFoundError('Category');
 
       category._isDeleted = false;
       await category.save();
@@ -665,7 +688,9 @@ export class AdminService {
       const category = new Category({
         ...data,
         user: adminUser._id,
-        isDefault: true,
+        // Not a per-user default: isDefault marks the fallback category used by deleteOne
+        // reassignment and blocks deletion, so admin-created categories must stay deletable.
+        isDefault: false,
       });
       await category.save();
 
@@ -700,6 +725,7 @@ export class AdminService {
     sortField: string = 'date',
     sortOrder: number = -1
   ) {
+    sortField = safeSortField(sortField, 'date', ['date','createdAt','updatedAt','amount','description','_isDeleted']);
     try {
       const query: any = {};
 
@@ -751,7 +777,7 @@ export class AdminService {
         .populate('category', 'title icon color type')
         .lean();
 
-      if (!expense) throw new Error('Expense not found');
+      if (!expense) throw new NotFoundError('Expense');
       return expense;
     } catch (error) {
       logger.error('Error fetching admin expense by id:', error as Error);
@@ -765,7 +791,7 @@ export class AdminService {
   async deleteExpense(expenseId: string, req?: Request) {
     try {
       const expense = await Expense.findById(expenseId);
-      if (!expense) throw new Error('Expense not found');
+      if (!expense) throw new NotFoundError('Expense');
 
       expense._isDeleted = true;
       await expense.save();
@@ -795,7 +821,7 @@ export class AdminService {
   async restoreExpense(expenseId: string, req?: Request) {
     try {
       const expense = await Expense.findById(expenseId);
-      if (!expense) throw new Error('Expense not found');
+      if (!expense) throw new NotFoundError('Expense');
 
       expense._isDeleted = false;
       await expense.save();
@@ -880,6 +906,7 @@ export class AdminService {
     sortField: string = 'timestamp',
     sortOrder: number = -1
   ) {
+    sortField = safeSortField(sortField, 'timestamp');
     try {
       const SyncOperation = mongoose.model('SyncOperation');
       const query: any = {};
@@ -1024,6 +1051,7 @@ export class AdminService {
     sortField: string = 'timestamp',
     sortOrder: number = -1
   ) {
+    sortField = safeSortField(sortField, 'timestamp');
     try {
       const ConflictResolution = mongoose.model('ConflictResolution');
       const skip = (page - 1) * limit;

@@ -6,6 +6,8 @@ import {
 } from '../middleware/plan.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
 import { requireOwnership, canAccessResource } from '../middleware/resource-ownership.middleware';
+import { validateRequestWithZod } from '../middleware';
+import { categorySchema, categoryUpdateSchema } from '../validations/category.validation';
 import { Permission } from '../types/permissions.types';
 import {
   createCategory,
@@ -27,6 +29,7 @@ router.post(
   '/create',
   requirePermission(Permission.CATEGORY_CREATE),
   checkPlanLimit('categories'),
+  validateRequestWithZod(categorySchema),
   createCategory
 );
 
@@ -45,6 +48,7 @@ router.put(
   '/update/:id',
   requirePermission(Permission.CATEGORY_UPDATE),
   requireOwnership('category'),
+  validateRequestWithZod(categoryUpdateSchema),
   updateCategory
 );
 

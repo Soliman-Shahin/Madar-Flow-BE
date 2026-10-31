@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { NextFunction, Response } from 'express';
 import { User, UserDocument } from '../models';
 import { CustomRequest } from '../types/custom-request';
+import mongoose from 'mongoose';
 import { sendError } from '../shared/helper';
 
 export const verifySession = async (
@@ -10,8 +11,12 @@ export const verifySession = async (
   next: NextFunction
 ) => {
   try {
-    const refreshToken = req.header('refresh-token')!;
-    const _id = req.header('_id')!;
+    const refreshToken = req.header('refresh-token');
+    const _id = req.header('_id');
+    // Reject malformed credentials up front so internal errors (hashing/cast) never reach the client.
+    if (!refreshToken || !_id || !mongoose.isValidObjectId(_id)) {
+      return sendError(res, 'Missing or invalid session credentials', 401, 'SESSION_INVALID');
+    }
     const user: UserDocument | null = await User.findByIdAndToken(
       _id,
       refreshToken
@@ -45,7 +50,7 @@ export const verifySession = async (
     } else {
       throw new Error('Refresh token has expired or the session is invalid');
     }
-  } catch (error: any) {
-    sendError(res, error.message, 401, 'SESSION_INVALID');
+  } catch {
+    sendError(res, 'Invalid or expired session', 401, 'SESSION_INVALID');
   }
 };
