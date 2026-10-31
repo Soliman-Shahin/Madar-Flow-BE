@@ -1,4 +1,9 @@
 {
+  "ts-node": {
+    // ts-node only loads files reachable by imports unless told otherwise; the global Express
+    // augmentation (src/app/types) must be loaded for `npm run dev` and the QA scripts.
+    "files": true
+  },
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */
 
