@@ -1,1042 +1,118 @@
-import {
-  User,
-  UserRole,
-  canManageTargetRole,
-  canAssignRole,
-  UserDocument,
-} from '../models/user.model';
-import { Expense } from '../models/expense.model';
-import { Category } from '../models/category.model';
-import logger from './logger.service';
-import { permissionCacheService } from './permission-cache.service';
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
-import { ConflictError, NotFoundError } from '../shared/errors';
-import { UserService } from './user.service';
-import { Request } from 'express';
-import { AuditAction } from '../models/audit-log.model';
-import { safeSearchPattern, safeSortField } from '../shared/search';
-import { auditAndNotifyStaff } from './audit-notifier.service';
+import { AdminUsersService } from './admin/admin-users.service';
+import { AdminCategoriesService } from './admin/admin-categories.service';
+import { AdminExpensesService } from './admin/admin-expenses.service';
+import { AdminSystemService } from './admin/admin-system.service';
 
-/** Credentials and one-time-token hashes that must never leave the server, even to staff. */
-const PRIVATE_USER_FIELDS = [
-  'password',
-  'sessions',
-  'passwordResetTokenHash',
-  'passwordResetExpiresAt',
-  'passwordResetRequestedAt',
-  'accountDeletionTokenHash',
-  'accountDeletionExpiresAt',
-] as const;
-const PRIVATE_USER_PROJECTION = PRIVATE_USER_FIELDS.map(
-  (field) => `-${field}`
-).join(' ');
-
-function stripPrivateUserFields<T extends Record<string, any>>(user: T): T {
-  const copy: Record<string, any> = { ...user };
-  for (const field of PRIVATE_USER_FIELDS) delete copy[field];
-  return copy as T;
-}
-
-export interface SyncTrendDay {
-  date: string;
-  total: number;
-  synced: number;
-  pending: number;
-  conflict: number;
-  error: number;
-  offline: number;
-}
+export type { SyncTrendDay } from './admin/admin-system.service';
 
 /**
- * Admin Service
+ * Admin Service (facade)
  *
- * Handles cross-user queries and system-wide aggregations for the Admin Dashboard.
- * Bypasses user-scoped logic found in regular services.
+ * Cross-user queries and system-wide aggregations for the Admin Dashboard. The implementation is
+ * split by resource under ./admin/; this class keeps the original API for controllers and tests.
  */
 export class AdminService {
-  /**
-   * Get global system statistics
-   */
-  async getSystemStats() {
-    try {
-      const [totalUsers, totalExpenses, totalCategories, recentExpenses] =
-        await Promise.all([
-          User.countDocuments(),
-          Expense.countDocuments(),
-          Category.countDocuments(),
-          // Get 5 most recent expenses across all users for activity feed
-          Expense.find()
-            .sort({ date: -1 })
-            .limit(5)
-            .populate('user', 'email username currency')
-            .lean(),
-        ]);
+  private readonly users = new AdminUsersService();
+  private readonly categories = new AdminCategoriesService();
+  private readonly expenses = new AdminExpensesService();
+  private readonly system = new AdminSystemService();
 
-      return {
-        totalUsers,
-        totalExpenses,
-        totalCategories,
-        recentExpenses,
-      };
-    } catch (error) {
-      logger.error('Error fetching system stats:', error as Error);
-      throw error;
-    }
+  getUsers(...args: Parameters<AdminUsersService['getUsers']>) {
+    return this.users.getUsers(...args);
   }
 
-  /**
-   * List all users with pagination, search, and status filter
-   */
-  async getUsers(
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
-    status: string = 'active',
-    sortField: string = 'createdAt',
-    sortOrder: number = -1
+  getUserById(...args: Parameters<AdminUsersService['getUserById']>) {
+    return this.users.getUserById(...args);
+  }
+
+  updateUser(...args: Parameters<AdminUsersService['updateUser']>) {
+    return this.users.updateUser(...args);
+  }
+
+  deleteUser(...args: Parameters<AdminUsersService['deleteUser']>) {
+    return this.users.deleteUser(...args);
+  }
+
+  restoreUser(...args: Parameters<AdminUsersService['restoreUser']>) {
+    return this.users.restoreUser(...args);
+  }
+
+  createUser(...args: Parameters<AdminUsersService['createUser']>) {
+    return this.users.createUser(...args);
+  }
+
+  getCategories(...args: Parameters<AdminCategoriesService['getCategories']>) {
+    return this.categories.getCategories(...args);
+  }
+
+  getCategoryById(
+    ...args: Parameters<AdminCategoriesService['getCategoryById']>
   ) {
-    sortField = safeSortField(sortField, 'createdAt', [
-      'createdAt',
-      'updatedAt',
-      'email',
-      'role',
-      'plan',
-      'isActive',
-      '_isDeleted',
-      'emailVerified',
-    ]);
-    try {
-      const query: any = {};
-
-      if (status === 'active') {
-        query.isActive = { $ne: false };
-        query._isDeleted = { $ne: true };
-      }
-      if (status === 'inactive') {
-        query.isActive = false;
-        query._isDeleted = { $ne: true };
-      }
-      if (status === 'deleted') query._isDeleted = true;
-
-      const userPattern = safeSearchPattern(search);
-      if (userPattern) {
-        query.$or = [
-          { email: { $regex: userPattern, $options: 'i' } },
-          { username: { $regex: userPattern, $options: 'i' } },
-          { fullName: { $regex: userPattern, $options: 'i' } },
-        ];
-      }
-
-      const skip = (page - 1) * limit;
-
-      const [users, total] = await Promise.all([
-        User.find(query)
-          .select(PRIVATE_USER_PROJECTION)
-          .sort({ [sortField]: sortOrder as 1 | -1 })
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        User.countDocuments(query),
-      ]);
-
-      return {
-        data: users,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit),
-        },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin users:', error as Error);
-      throw error;
-    }
+    return this.categories.getCategoryById(...args);
   }
 
-  /**
-   * Get user by ID with their stats
-   */
-  async getUserById(userId: string) {
-    try {
-      const user = await User.findById(userId)
-        .select(PRIVATE_USER_PROJECTION)
-        .lean();
-      if (!user) throw new NotFoundError('User');
-
-      const stats = await Expense.aggregate([
-        { $match: { user: user._id } },
-        {
-          $group: {
-            _id: null,
-            totalSpent: { $sum: '$amount' },
-            expenseCount: { $sum: 1 },
-          },
-        },
-      ]);
-
-      return {
-        ...user,
-        stats: stats[0] || { totalSpent: 0, expenseCount: 0 },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin user by id:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update user details (e.g., role, plan, permissions)
-   * Note: For plan assignment with subscription tracking, use planService.assignPlan()
-   */
-  async updateUser(
-    actorRole: UserRole,
-    userId: string,
-    updateData: Partial<UserDocument>,
-    req?: Request
+  updateCategory(
+    ...args: Parameters<AdminCategoriesService['updateCategory']>
   ) {
-    try {
-      const userToUpdate = await User.findById(userId);
-      if (!userToUpdate) throw new NotFoundError('User');
-
-      if (!canManageTargetRole(actorRole, userToUpdate.role as UserRole)) {
-        throw new Error('You do not have permission to modify this user');
-      }
-
-      if (
-        updateData.role &&
-        !canAssignRole(actorRole, updateData.role as UserRole)
-      ) {
-        throw new Error(
-          `You do not have permission to assign the role: ${updateData.role}`
-        );
-      }
-
-      const ALLOWED_FIELDS = [
-        'role',
-        'fullName',
-        'phone',
-        'currency',
-        'username',
-        'isActive',
-        '_isDeleted',
-        'plan',
-        'planExpiresAt',
-        'planStartedAt',
-        'customPermissions',
-      ];
-      const safeUpdate: Record<string, any> = {};
-      for (const field of ALLOWED_FIELDS) {
-        if ((updateData as any)[field] !== undefined) {
-          safeUpdate[field] = (updateData as any)[field];
-        }
-      }
-
-      Object.assign(userToUpdate, safeUpdate);
-      await userToUpdate.save();
-
-      if (safeUpdate.role || safeUpdate.plan || safeUpdate.customPermissions) {
-        permissionCacheService.invalidateUser(userId);
-        logger.debug(`Invalidated permission cache for user ${userId}`);
-      }
-
-      await auditAndNotifyStaff({
-        req,
-        actorRole,
-        action: AuditAction.USER_UPDATED,
-        notification: {
-          title: 'User Updated',
-          message: `User ${userToUpdate.email} has been updated.`,
-          type: 'info',
-        },
-        changes: safeUpdate,
-        targetUserId: userToUpdate._id.toString(),
-        targetResourceType: 'User',
-        targetResourceId: userToUpdate._id.toString(),
-      });
-
-      return stripPrivateUserFields(userToUpdate.toObject());
-    } catch (error) {
-      logger.error('Error updating user:', error as Error);
-      throw error;
-    }
+    return this.categories.updateCategory(...args);
   }
 
-  /**
-   * Delete user (soft delete)
-   */
-  async deleteUser(actorRole: UserRole, userId: string, req?: Request) {
-    try {
-      const user = await User.findById(userId);
-      if (!user) throw new NotFoundError('User');
-
-      if (!canManageTargetRole(actorRole, user.role as UserRole)) {
-        throw new Error('You do not have permission to delete this user');
-      }
-
-      user._isDeleted = true;
-      await user.save();
-
-      await Expense.updateMany({ user: user._id }, { _isDeleted: true });
-      await Category.updateMany(
-        { user: user._id, isDefault: false },
-        { _isDeleted: true }
-      );
-
-      await auditAndNotifyStaff({
-        req,
-        actorRole,
-        action: AuditAction.USER_DELETED,
-        notification: {
-          title: 'User Deleted',
-          message: `User ${user.email} was deleted.`,
-          type: 'warn',
-        },
-        targetUserId: user._id.toString(),
-        targetResourceType: 'User',
-        targetResourceId: user._id.toString(),
-      });
-
-      return user;
-    } catch (error) {
-      logger.error('Error soft deleting user:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Restore user (undo soft delete)
-   */
-  async restoreUser(actorRole: UserRole, userId: string, req?: Request) {
-    try {
-      const user = await User.findById(userId);
-      if (!user) throw new NotFoundError('User');
-
-      if (!canManageTargetRole(actorRole, user.role as UserRole)) {
-        throw new Error('You do not have permission to restore this user');
-      }
-
-      user._isDeleted = false;
-      await user.save();
-
-      await Expense.updateMany({ user: user._id }, { _isDeleted: false });
-      await Category.updateMany(
-        { user: user._id, isDefault: false },
-        { _isDeleted: false }
-      );
-
-      await auditAndNotifyStaff({
-        req,
-        actorRole,
-        action: AuditAction.USER_RESTORED,
-        notification: {
-          title: 'User Restored',
-          message: `User ${user.email} was restored.`,
-          type: 'success',
-        },
-        targetUserId: user._id.toString(),
-        targetResourceType: 'User',
-        targetResourceId: user._id.toString(),
-      });
-
-      return user;
-    } catch (error) {
-      logger.error('Error restoring user:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create a new user (Admin action)
-   */
-  async createUser(
-    actorRole: UserRole,
-    data: Partial<UserDocument>,
-    req?: Request
+  deleteCategory(
+    ...args: Parameters<AdminCategoriesService['deleteCategory']>
   ) {
-    try {
-      if (data.role && !canAssignRole(actorRole, data.role as UserRole)) {
-        throw new Error(
-          `You do not have permission to create a user with role: ${data.role}`
-        );
-      }
-
-      const existingUser = await UserService.findByEmail((data as any).email);
-      if (existingUser) {
-        throw new ConflictError('User with this email already exists');
-      }
-
-      const hashedPassword = await bcrypt.hash(
-        (data as any).password as string,
-        10
-      );
-
-      const newUser = new User({
-        ...data,
-        password: hashedPassword,
-        emailVerified: true,
-      });
-
-      await newUser.save();
-
-      const userObj = newUser.toObject();
-      delete (userObj as any).password;
-      delete (userObj as any).sessions;
-
-      await auditAndNotifyStaff({
-        req,
-        actorRole,
-        action: AuditAction.USER_CREATED,
-        notification: {
-          title: 'New User Created',
-          message: `User ${newUser.email} joined.`,
-          type: 'success',
-        },
-        changes: data,
-        targetUserId: newUser._id.toString(),
-        targetResourceType: 'User',
-        targetResourceId: newUser._id.toString(),
-      });
-
-      return userObj;
-    } catch (error) {
-      logger.error('Error creating user (Admin):', error as Error);
-      throw error;
-    }
+    return this.categories.deleteCategory(...args);
   }
 
-  /**
-   * List all categories with pagination, search, and status filter
-   */
-  async getCategories(
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
-    status: string = 'active',
-    sortField: string = 'createdAt',
-    sortOrder: number = -1
+  restoreCategory(
+    ...args: Parameters<AdminCategoriesService['restoreCategory']>
   ) {
-    sortField = safeSortField(sortField, 'createdAt', [
-      'createdAt',
-      'updatedAt',
-      'title',
-      'type',
-      'isDefault',
-      'isActive',
-      'order',
-      '_isDeleted',
-    ]);
-    try {
-      const query: any = {};
-
-      if (status === 'active') {
-        query.isActive = { $ne: false };
-        query._isDeleted = { $ne: true };
-      }
-      if (status === 'inactive') {
-        query.isActive = false;
-        query._isDeleted = { $ne: true };
-      }
-      if (status === 'deleted') {
-        query._isDeleted = true;
-      }
-
-      const titlePattern = safeSearchPattern(search);
-      if (titlePattern) {
-        query.$or = [{ title: { $regex: titlePattern, $options: 'i' } }];
-      }
-
-      const skip = (page - 1) * limit;
-
-      const [categories, total] = await Promise.all([
-        Category.find(query)
-          .sort({ isDefault: -1, [sortField]: sortOrder as 1 | -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('user', 'email username')
-          .lean(),
-        Category.countDocuments(query),
-      ]);
-
-      return {
-        data: categories,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit),
-        },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin categories:', error as Error);
-      throw error;
-    }
+    return this.categories.restoreCategory(...args);
   }
 
-  /**
-   * Get category by ID
-   */
-  async getCategoryById(categoryId: string) {
-    try {
-      const category = await Category.findById(categoryId)
-        .populate('user', 'email username')
-        .lean();
-      if (!category) throw new NotFoundError('Category');
-
-      // Get stats for this category across all users
-      const stats = await Expense.aggregate([
-        { $match: { category: category._id } },
-        {
-          $group: {
-            _id: null,
-            totalSpent: { $sum: '$amount' },
-            expenseCount: { $sum: 1 },
-          },
-        },
-      ]);
-
-      return {
-        ...category,
-        stats: stats[0] || { totalSpent: 0, expenseCount: 0 },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin category by id:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update category details
-   */
-  async updateCategory(
-    categoryId: string,
-    updateData: Partial<typeof Category>,
-    req?: Request
+  createCategory(
+    ...args: Parameters<AdminCategoriesService['createCategory']>
   ) {
-    try {
-      const category = await Category.findById(categoryId);
-      if (!category) throw new NotFoundError('Category');
-
-      const ALLOWED_FIELDS = ['title', 'icon', 'color', 'type', 'isActive'];
-      const safeUpdate: Record<string, any> = {};
-      for (const field of ALLOWED_FIELDS) {
-        if ((updateData as any)[field] !== undefined) {
-          safeUpdate[field] = (updateData as any)[field];
-        }
-      }
-      if ((updateData as any)['name'] !== undefined) {
-        safeUpdate['title'] = (updateData as any)['name'];
-      }
-
-      Object.assign(category, safeUpdate);
-      await category.save();
-
-      await auditAndNotifyStaff({
-        req,
-        action: AuditAction.CATEGORY_UPDATED,
-        notification: {
-          title: 'Category Updated',
-          message: `Category '${category.title}' was updated.`,
-          type: 'info',
-        },
-        changes: safeUpdate,
-        targetResourceType: 'Category',
-        targetResourceId: category._id.toString(),
-      });
-
-      return category;
-    } catch (error) {
-      logger.error('Error updating category:', error as Error);
-      throw error;
-    }
+    return this.categories.createCategory(...args);
   }
 
-  /**
-   * Delete category (soft delete)
-   */
-  async deleteCategory(categoryId: string, req?: Request) {
-    try {
-      const category = await Category.findById(categoryId);
-      if (!category) throw new NotFoundError('Category');
-
-      if (category.isDefault) {
-        throw new ConflictError('Cannot delete a system default category');
-      }
-
-      category._isDeleted = true;
-      await category.save();
-
-      await Expense.updateMany(
-        { category: category._id },
-        { $set: { _isDeleted: true } }
-      );
-
-      await auditAndNotifyStaff({
-        req,
-        action: AuditAction.CATEGORY_DELETED,
-        notification: {
-          title: 'Category Deleted',
-          message: `Category '${category.title}' was deleted.`,
-          type: 'warn',
-        },
-        targetResourceType: 'Category',
-        targetResourceId: category._id.toString(),
-      });
-
-      return category;
-    } catch (error) {
-      logger.error('Error soft deleting category:', error as Error);
-      throw error;
-    }
+  getExpenses(...args: Parameters<AdminExpensesService['getExpenses']>) {
+    return this.expenses.getExpenses(...args);
   }
 
-  /**
-   * Restore category
-   */
-  async restoreCategory(categoryId: string, req?: Request) {
-    try {
-      const category = await Category.findById(categoryId);
-      if (!category) throw new NotFoundError('Category');
-
-      category._isDeleted = false;
-      await category.save();
-
-      await Expense.updateMany(
-        { category: category._id },
-        { _isDeleted: false }
-      );
-
-      await auditAndNotifyStaff({
-        req,
-        action: AuditAction.CATEGORY_RESTORED,
-        notification: {
-          title: 'Category Restored',
-          message: `Category '${category.title}' was restored.`,
-          type: 'success',
-        },
-        targetResourceType: 'Category',
-        targetResourceId: category._id.toString(),
-      });
-
-      return category;
-    } catch (error) {
-      logger.error('Error restoring category:', error as Error);
-      throw error;
-    }
+  getExpenseById(...args: Parameters<AdminExpensesService['getExpenseById']>) {
+    return this.expenses.getExpenseById(...args);
   }
 
-  /**
-   * Create a system default category
-   */
-  async createCategory(categoryData: Partial<typeof Category>, req?: Request) {
-    try {
-      const adminUser = await User.findOne({ role: UserRole.Admin });
-      if (!adminUser)
-        throw new Error('No admin user found to assign the category to');
-
-      const data: any = { ...categoryData };
-      if (data.name && !data.title) {
-        data.title = data.name;
-        delete data.name;
-      }
-
-      const category = new Category({
-        ...data,
-        user: adminUser._id,
-        // Not a per-user default: isDefault marks the fallback category used by deleteOne
-        // reassignment and blocks deletion, so admin-created categories must stay deletable.
-        isDefault: false,
-      });
-      await category.save();
-
-      await auditAndNotifyStaff({
-        req,
-        action: AuditAction.CATEGORY_CREATED,
-        notification: {
-          title: 'New Category',
-          message: `Category '${category.title}' was created.`,
-          type: 'success',
-        },
-        changes: data,
-        targetResourceType: 'Category',
-        targetResourceId: category._id.toString(),
-      });
-
-      return category;
-    } catch (error) {
-      logger.error('Error creating category:', error as Error);
-      throw error;
-    }
+  deleteExpense(...args: Parameters<AdminExpensesService['deleteExpense']>) {
+    return this.expenses.deleteExpense(...args);
   }
 
-  /**
-   * List all expenses with pagination and search/filters
-   */
-  async getExpenses(
-    page: number = 1,
-    limit: number = 10,
-    search?: string,
-    status: string = 'active',
-    sortField: string = 'date',
-    sortOrder: number = -1
+  restoreExpense(...args: Parameters<AdminExpensesService['restoreExpense']>) {
+    return this.expenses.restoreExpense(...args);
+  }
+
+  getSystemStats(...args: Parameters<AdminSystemService['getSystemStats']>) {
+    return this.system.getSystemStats(...args);
+  }
+
+  getSystemHealth(...args: Parameters<AdminSystemService['getSystemHealth']>) {
+    return this.system.getSystemHealth(...args);
+  }
+
+  getSyncOperations(
+    ...args: Parameters<AdminSystemService['getSyncOperations']>
   ) {
-    sortField = safeSortField(sortField, 'date', [
-      'date',
-      'createdAt',
-      'updatedAt',
-      'amount',
-      'description',
-      '_isDeleted',
-    ]);
-    try {
-      const query: any = {};
-
-      if (status === 'active') query._isDeleted = { $ne: true };
-      if (status === 'deleted') query._isDeleted = true;
-
-      const descriptionPattern = safeSearchPattern(search);
-      if (descriptionPattern) {
-        query.$or = [
-          { description: { $regex: descriptionPattern, $options: 'i' } },
-        ];
-      }
-
-      const skip = (page - 1) * limit;
-
-      const [expenses, total] = await Promise.all([
-        Expense.find(query)
-          .sort({ [sortField]: sortOrder as 1 | -1, createdAt: -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('user', 'email username fullName currency')
-          .populate('category', 'title icon color type')
-          .lean(),
-        Expense.countDocuments(query),
-      ]);
-
-      return {
-        data: expenses,
-        pagination: {
-          total,
-          page,
-          limit,
-          pages: Math.ceil(total / limit),
-        },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin expenses:', error as Error);
-      throw error;
-    }
+    return this.system.getSyncOperations(...args);
   }
 
-  /**
-   * Get expense by ID
-   */
-  async getExpenseById(expenseId: string) {
-    try {
-      const expense = await Expense.findById(expenseId)
-        .populate('user', 'email username fullName currency')
-        .populate('category', 'title icon color type')
-        .lean();
-
-      if (!expense) throw new NotFoundError('Expense');
-      return expense;
-    } catch (error) {
-      logger.error('Error fetching admin expense by id:', error as Error);
-      throw error;
-    }
+  getSyncTrend(...args: Parameters<AdminSystemService['getSyncTrend']>) {
+    return this.system.getSyncTrend(...args);
   }
 
-  /**
-   * Delete expense (soft delete)
-   */
-  async deleteExpense(expenseId: string, req?: Request) {
-    try {
-      const expense = await Expense.findById(expenseId);
-      if (!expense) throw new NotFoundError('Expense');
-
-      expense._isDeleted = true;
-      await expense.save();
-
-      await auditAndNotifyStaff({
-        req,
-        action: AuditAction.EXPENSE_DELETED,
-        notification: {
-          title: 'Expense Deleted',
-          message: `An expense of ${expense.amount} was deleted.`,
-          type: 'warn',
-        },
-        targetResourceType: 'Expense',
-        targetResourceId: expense._id.toString(),
-      });
-
-      return expense;
-    } catch (error) {
-      logger.error('Error soft deleting expense:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Restore expense (undo soft delete)
-   */
-  async restoreExpense(expenseId: string, req?: Request) {
-    try {
-      const expense = await Expense.findById(expenseId);
-      if (!expense) throw new NotFoundError('Expense');
-
-      expense._isDeleted = false;
-      await expense.save();
-
-      await auditAndNotifyStaff({
-        req,
-        action: AuditAction.EXPENSE_RESTORED,
-        notification: {
-          title: 'Expense Restored',
-          message: `An expense of ${expense.amount} was restored.`,
-          type: 'success',
-        },
-        targetResourceType: 'Expense',
-        targetResourceId: expense._id.toString(),
-      });
-
-      return expense;
-    } catch (error) {
-      logger.error('Error restoring expense:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get system health metrics
-   */
-  async getSystemHealth() {
-    try {
-      const os = require('os');
-      const mongoose = require('mongoose');
-
-      const totalMem = os.totalmem();
-      const freeMem = os.freemem();
-      const usedMem = totalMem - freeMem;
-      const memUsagePercent = (usedMem / totalMem) * 100;
-
-      const cpus = os.cpus();
-      const cpuLoad = os.loadavg();
-
-      const dbState = mongoose.connection.readyState;
-      const dbStatus =
-        dbState === 1
-          ? 'Connected'
-          : dbState === 2
-            ? 'Connecting'
-            : dbState === 0
-              ? 'Disconnected'
-              : 'Unknown';
-
-      return {
-        status: 'OK',
-        uptime: process.uptime(),
-        memory: {
-          total: totalMem,
-          free: freeMem,
-          used: usedMem,
-          usagePercent: memUsagePercent.toFixed(2),
-        },
-        cpu: {
-          cores: cpus.length,
-          model: cpus[0].model,
-          loadAverage: cpuLoad,
-        },
-        database: {
-          status: dbStatus,
-          state: dbState,
-        },
-        timestamp: new Date(),
-      };
-    } catch (error) {
-      logger.error('Error fetching system health:', error as Error);
-      throw error;
-    }
-  }
-  /**
-   * Get sync operations across all users
-   */
-  async getSyncOperations(
-    page: number = 1,
-    limit: number = 20,
-    status?: string,
-    sortField: string = 'timestamp',
-    sortOrder: number = -1
+  getSyncConflicts(
+    ...args: Parameters<AdminSystemService['getSyncConflicts']>
   ) {
-    sortField = safeSortField(sortField, 'timestamp');
-    try {
-      const SyncOperation = mongoose.model('SyncOperation');
-      const query: any = {};
-      if (status) query.status = status;
-
-      const skip = (page - 1) * limit;
-      const [operations, total] = await Promise.all([
-        SyncOperation.find(query)
-          .sort({ [sortField]: sortOrder as 1 | -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('user', 'email username')
-          .lean(),
-        SyncOperation.countDocuments(query),
-      ]);
-
-      return {
-        data: operations,
-        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin sync operations:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get the daily sync operation trend (UTC days, gap-filled).
-   *
-   * Read-only aggregate used by the sync dashboard. Days are clamped so a
-   * malformed query cannot trigger an unbounded aggregation.
-   */
-  async getSyncTrend(days: number = 14, now: Date = new Date()) {
-    const DAY = 86_400_000;
-    const range = Math.min(Math.max(Math.trunc(Number(days)) || 14, 1), 90);
-    const today = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-    );
-    const start = new Date(today.getTime() - (range - 1) * DAY);
-    const endExclusive = new Date(today.getTime() + DAY);
-
-    try {
-      const SyncOperation = mongoose.model('SyncOperation');
-      const rows: {
-        _id: { date?: string; status?: string };
-        count?: number;
-      }[] = await SyncOperation.aggregate([
-        { $match: { timestamp: { $gte: start, $lt: endExclusive } } },
-        {
-          $group: {
-            _id: {
-              date: {
-                $dateToString: {
-                  format: '%Y-%m-%d',
-                  date: '$timestamp',
-                  timezone: 'UTC',
-                },
-              },
-              status: '$status',
-            },
-            count: { $sum: 1 },
-          },
-        },
-      ]);
-
-      const buckets = new Map<string, SyncTrendDay>();
-      for (let index = 0; index < range; index += 1) {
-        const date = new Date(start.getTime() + index * DAY)
-          .toISOString()
-          .slice(0, 10);
-        buckets.set(date, {
-          date,
-          total: 0,
-          synced: 0,
-          pending: 0,
-          conflict: 0,
-          error: 0,
-          offline: 0,
-        });
-      }
-      for (const row of rows) {
-        const bucket = row._id?.date ? buckets.get(row._id.date) : undefined;
-        if (!bucket) continue;
-        const count = Number(row.count) || 0;
-        bucket.total += count;
-        switch (row._id?.status) {
-          case 'synced':
-          case 'pending':
-          case 'conflict':
-          case 'error':
-          case 'offline':
-            bucket[row._id.status] += count;
-            break;
-          default:
-            break;
-        }
-      }
-
-      const series = [...buckets.values()];
-      const totals = series.reduce(
-        (acc, day) => ({
-          total: acc.total + day.total,
-          synced: acc.synced + day.synced,
-          pending: acc.pending + day.pending,
-          conflict: acc.conflict + day.conflict,
-          error: acc.error + day.error,
-          offline: acc.offline + day.offline,
-        }),
-        {
-          total: 0,
-          synced: 0,
-          pending: 0,
-          conflict: 0,
-          error: 0,
-          offline: 0,
-        }
-      );
-
-      return {
-        period: {
-          days: range,
-          timezone: 'UTC',
-          start: start.toISOString(),
-          endExclusive: endExclusive.toISOString(),
-          generatedAt: new Date().toISOString(),
-        },
-        totals,
-        series,
-      };
-    } catch (error) {
-      logger.error('Error fetching sync trend:', error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get sync conflicts
-   */
-  async getSyncConflicts(
-    page: number = 1,
-    limit: number = 20,
-    sortField: string = 'timestamp',
-    sortOrder: number = -1
-  ) {
-    sortField = safeSortField(sortField, 'timestamp');
-    try {
-      const ConflictResolution = mongoose.model('ConflictResolution');
-      const skip = (page - 1) * limit;
-
-      const [conflicts, total] = await Promise.all([
-        ConflictResolution.find()
-          .sort({ [sortField]: sortOrder as 1 | -1 })
-          .skip(skip)
-          .limit(limit)
-          .populate('user', 'email username')
-          .lean(),
-        ConflictResolution.countDocuments(),
-      ]);
-
-      return {
-        data: conflicts,
-        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
-      };
-    } catch (error) {
-      logger.error('Error fetching admin sync conflicts:', error as Error);
-      throw error;
-    }
+    return this.system.getSyncConflicts(...args);
   }
 }
 
