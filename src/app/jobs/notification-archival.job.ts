@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import cron, { type ScheduledTask } from 'node-cron';
 import logger from '../services/logger.service';
 import { NotificationArchivalService } from '../services/notification-archival.service';
@@ -38,11 +39,11 @@ export class NotificationArchivalJob {
       const result =
         await NotificationRetentionService.deleteExpired(referenceTime);
       return result.deletedUserNotifications;
-    } catch (error: any) {
+    } catch (error: unknown) {
       jobRuns.fail(JOB_NAME, error);
       logger.error(
         '[NotificationArchivalJob] Execution failed',
-        error?.message || 'unknown error'
+        asError(error)
       );
       return 0;
     } finally {

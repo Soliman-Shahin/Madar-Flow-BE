@@ -1,3 +1,4 @@
+import { asError, errorMessage, errorCode } from '../shared/errors';
 import { Request, Response } from 'express';
 import { sendError, sendSuccess } from '../shared/helper';
 import logger from '../services/logger.service';
@@ -41,9 +42,9 @@ class RoleController {
       });
 
       sendSuccess(res, result, 'Roles fetched successfully');
-    } catch (error: any) {
-      logger.error('Error fetching roles:', error);
-      sendError(res, error.message, 500, 'INTERNAL_ERROR');
+    } catch (error: unknown) {
+      logger.error('Error fetching roles:', asError(error));
+      sendError(res, errorMessage(error), 500, 'INTERNAL_ERROR');
     }
   };
 
@@ -56,9 +57,9 @@ class RoleController {
         return;
       }
       sendSuccess(res, role, 'Role fetched successfully');
-    } catch (error: any) {
-      logger.error('Error fetching role:', error);
-      sendError(res, error.message, 500, 'INTERNAL_ERROR');
+    } catch (error: unknown) {
+      logger.error('Error fetching role:', asError(error));
+      sendError(res, errorMessage(error), 500, 'INTERNAL_ERROR');
     }
   };
 
@@ -67,9 +68,9 @@ class RoleController {
       const roleData = req.body;
       const newRole = await roleService.createRole(roleData);
       sendSuccess(res, newRole, 'Role created successfully');
-    } catch (error: any) {
-      logger.error('Error creating role:', error);
-      if (error.code === 11000) {
+    } catch (error: unknown) {
+      logger.error('Error creating role:', asError(error));
+      if (errorCode(error) === 11000) {
         sendError(
           res,
           'Role with this name or slug already exists',
@@ -77,7 +78,7 @@ class RoleController {
           'CONFLICT'
         );
       } else {
-        sendError(res, error.message, 400, 'BAD_REQUEST');
+        sendError(res, errorMessage(error), 400, 'BAD_REQUEST');
       }
     }
   };
@@ -92,9 +93,9 @@ class RoleController {
         return;
       }
       sendSuccess(res, updatedRole, 'Role updated successfully');
-    } catch (error: any) {
-      logger.error('Error updating role:', error);
-      if (error.code === 11000) {
+    } catch (error: unknown) {
+      logger.error('Error updating role:', asError(error));
+      if (errorCode(error) === 11000) {
         sendError(
           res,
           'Role with this name or slug already exists',
@@ -103,8 +104,8 @@ class RoleController {
         );
         return;
       }
-      const { status, code } = mapServiceError(error.message || '');
-      sendError(res, error.message, status, code);
+      const { status, code } = mapServiceError(errorMessage(error) || '');
+      sendError(res, errorMessage(error), status, code);
     }
   };
 
@@ -113,10 +114,10 @@ class RoleController {
       const { id } = req.params;
       await roleService.deleteRole(id as string);
       sendSuccess(res, null, 'Role deleted successfully');
-    } catch (error: any) {
-      logger.error('Error deleting role:', error);
-      const { status, code } = mapServiceError(error.message || '');
-      sendError(res, error.message, status, code);
+    } catch (error: unknown) {
+      logger.error('Error deleting role:', asError(error));
+      const { status, code } = mapServiceError(errorMessage(error) || '');
+      sendError(res, errorMessage(error), status, code);
     }
   };
 }

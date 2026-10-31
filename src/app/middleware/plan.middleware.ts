@@ -1,3 +1,4 @@
+import { errorMessage, errorCode, asError } from '../shared/errors';
 import { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/helper';
 import { planService } from '../services/plan.service';
@@ -82,8 +83,8 @@ export const attachPlanContext = async (
     );
 
     next();
-  } catch (error: any) {
-    logger.error('Error in attachPlanContext:', error.message);
+  } catch (error: unknown) {
+    logger.error('Error in attachPlanContext:', asError(error));
     sendError(res, 'Failed to load plan context', 500, 'INTERNAL_ERROR');
   }
 };
@@ -145,19 +146,19 @@ export const checkPlanLimit = (limitType: LimitType) => {
       }
 
       next();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // PlanLimitError has statusCode 403 and code 'PLAN_LIMIT_EXCEEDED'
-      if (error.code === 'PLAN_LIMIT_EXCEEDED') {
+      if (errorCode(error) === 'PLAN_LIMIT_EXCEEDED') {
         sendError(
           res,
-          error.message,
+          errorMessage(error),
           403,
           'PLAN_LIMIT_EXCEEDED',
-          error.details
+          (error as { details?: unknown }).details
         );
         return;
       }
-      logger.error('Error in checkPlanLimit middleware:', error.message);
+      logger.error('Error in checkPlanLimit middleware:', asError(error));
       sendError(res, 'Failed to check plan limits', 500, 'INTERNAL_ERROR');
     }
   };

@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 import { AppSettings } from '../models/app-settings.model';
-import { AppError } from '../shared/errors';
+import { AppError, errorCode } from '../shared/errors';
 import type { AppSettingsUpdate } from '../validations/app-settings.validation';
 
 export const APP_SETTINGS_SECTIONS = [
@@ -70,8 +70,8 @@ export class AppSettingsService {
         { $setOnInsert: { key: 'app', revision: 0 } },
         { upsert: true }
       );
-    } catch (error: any) {
-      if (error?.code !== 11000) throw error;
+    } catch (error: unknown) {
+      if (errorCode(error) !== 11000) throw error;
     }
   }
 

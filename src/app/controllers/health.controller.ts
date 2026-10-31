@@ -1,3 +1,4 @@
+import { errorMessage } from '../shared/errors';
 import { Request, Response } from 'express';
 import { sendSuccess, sendError } from '../shared/helper';
 import mongoose from 'mongoose';
@@ -70,13 +71,13 @@ async function checkDatabase(): Promise<HealthCheckResult> {
         },
       };
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       status: 'fail',
       message: 'Database check failed',
       responseTime: Date.now() - startTime,
       details: {
-        error: error.message,
+        error: errorMessage(error),
       },
     };
   }
@@ -154,10 +155,10 @@ export const basicHealthCheck = async (req: Request, res: Response) => {
     };
 
     return res.status(200).json(health);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return res.status(503).json({
       status: 'error',
-      message: error.message,
+      message: errorMessage(error),
     });
   }
 };
@@ -174,7 +175,7 @@ export const detailedHealthCheck = async (req: Request, res: Response) => {
     return res
       .status(statusCode)
       .json({ status: health.status, timestamp: health.timestamp });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return sendError(res, 'Health check failed', 500, 'HEALTH_CHECK_FAILED');
   }
 };
@@ -188,8 +189,8 @@ export const diagnosticsHealthCheck = async (req: Request, res: Response) => {
     const health = await performHealthChecks();
     const statusCode = health.status === 'unhealthy' ? 503 : 200;
     return res.status(statusCode).json(health);
-  } catch (error: any) {
-    return sendError(res, error.message, 500, 'HEALTH_CHECK_FAILED');
+  } catch (error: unknown) {
+    return sendError(res, errorMessage(error), 500, 'HEALTH_CHECK_FAILED');
   }
 };
 
@@ -213,10 +214,10 @@ export const readinessCheck = async (req: Request, res: Response) => {
         timestamp: new Date().toISOString(),
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     return res.status(503).json({
       status: 'not ready',
-      reason: error.message,
+      reason: errorMessage(error),
       timestamp: new Date().toISOString(),
     });
   }

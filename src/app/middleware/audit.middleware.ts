@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response, NextFunction } from 'express';
 import { auditLogService } from '../services/audit-log.service';
 import { AuditAction } from '../models/audit-log.model';
@@ -45,8 +46,8 @@ export const auditRequest = (action: AuditAction) => {
       };
 
       next();
-    } catch (error: any) {
-      logger.error('Error in audit middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in audit middleware:', asError(error));
       next();
     }
   };
@@ -113,8 +114,8 @@ export const auditResourceUpdate = (
     if (getOriginalData) {
       try {
         originalData = await getOriginalData(req);
-      } catch (error: any) {
-        logger.warn('Failed to fetch original data for audit:', error.message);
+      } catch (error: unknown) {
+        logger.warn('Failed to fetch original data for audit:', asError(error));
       }
     }
 

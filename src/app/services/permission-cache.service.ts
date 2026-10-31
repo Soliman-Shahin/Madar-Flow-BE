@@ -1,3 +1,4 @@
+import { errorMessage } from '../shared/errors';
 import NodeCache from 'node-cache';
 import { Permission } from '../types/permissions.types';
 import { UserPlanContext } from '../types/plan.types';
@@ -60,8 +61,10 @@ class PermissionCacheService {
       this.cache.set(cacheKey, planContext);
 
       return planContext;
-    } catch (error: any) {
-      logger.error(`Error getting plan context from cache: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(
+        `Error getting plan context from cache: ${errorMessage(error)}`
+      );
       // On error, bypass cache and fetch directly
       return await planService.getUserPlanContext(userId);
     }

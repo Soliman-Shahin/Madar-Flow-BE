@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response } from 'express';
 import { auditLogService } from '../services/audit-log.service';
 import { AuditAction, AuditSeverity } from '../models/audit-log.model';
@@ -55,8 +56,8 @@ class AuditLogController {
       const result = await auditLogService.query(filters);
 
       sendSuccess(res, result, 'Audit logs retrieved successfully');
-    } catch (error: any) {
-      logger.error('Error getting audit logs:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting audit logs:', asError(error));
       sendError(res, 'Failed to retrieve audit logs', 500, 'INTERNAL_ERROR');
     }
   }
@@ -79,8 +80,8 @@ class AuditLogController {
       const result = await auditLogService.getUserLogs(userId, options);
 
       sendSuccess(res, result, 'User audit logs retrieved successfully');
-    } catch (error: any) {
-      logger.error('Error getting user audit logs:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting user audit logs:', asError(error));
       sendError(
         res,
         'Failed to retrieve user audit logs',
@@ -106,8 +107,8 @@ class AuditLogController {
         { logs },
         'Recent security events retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting recent security events:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting recent security events:', asError(error));
       sendError(
         res,
         'Failed to retrieve recent security events',
@@ -140,8 +141,8 @@ class AuditLogController {
       const stats = await auditLogService.getStats(start, end);
 
       sendSuccess(res, stats, 'Audit log statistics retrieved successfully');
-    } catch (error: any) {
-      logger.error('Error getting audit log stats:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting audit log stats:', asError(error));
       sendError(
         res,
         'Failed to retrieve audit log statistics',
@@ -188,8 +189,8 @@ class AuditLogController {
         },
         `Deleted ${deletedCount} old audit logs`
       );
-    } catch (error: any) {
-      logger.error('Error cleaning up audit logs:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error cleaning up audit logs:', asError(error));
       sendError(res, 'Failed to cleanup audit logs', 500, 'INTERNAL_ERROR');
     }
   }

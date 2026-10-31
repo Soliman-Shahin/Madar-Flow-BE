@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import cron, { type ScheduledTask } from 'node-cron';
 import logger from '../services/logger.service';
 import { SubscriptionExpiryReminderService } from '../services/subscription-expiry-reminder.service';
@@ -28,10 +29,10 @@ export class SubscriptionExpiryReminderJob {
       logger.info(
         `[SubscriptionExpiryReminderJob] Scheduler started with schedule: ${SUBSCRIPTION_EXPIRY_REMINDER_CRON}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
         '[SubscriptionExpiryReminderJob] Scheduler registration failed',
-        error?.message || 'unknown error'
+        asError(error)
       );
       return;
     }
@@ -62,11 +63,11 @@ export class SubscriptionExpiryReminderJob {
       await SubscriptionExpiryReminderService.processExpiringSubscriptions(
         referenceTime
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       jobRuns.fail(JOB_NAME, error);
       logger.error(
         '[SubscriptionExpiryReminderJob] Execution failed',
-        error?.message || 'unknown error'
+        asError(error)
       );
     } finally {
       this.executing = false;

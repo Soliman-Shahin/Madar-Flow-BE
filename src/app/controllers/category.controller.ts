@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { sendError, sendSuccess } from '../shared/helper';
 import { CategoryService } from '../services/category.service';
-import { AppError } from '../shared/errors';
+import { AppError, errorMessage } from '../shared/errors';
 
 interface CategoryQueryParams {
   title?: string;
@@ -25,7 +25,7 @@ const createCategory = async (
       req
     );
     sendSuccess(res, category, 'Category created successfully', 201);
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Propagate AppError subclasses (PlanLimitError, etc.) with correct status code
     if (error instanceof AppError) {
       return sendError(
@@ -36,7 +36,7 @@ const createCategory = async (
         error.details
       );
     }
-    sendError(res, error.message);
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -49,8 +49,8 @@ const getCategories = async (
     const userId = req.user_id as string;
     const result = await CategoryService.getCategories(req.query, userId);
     sendSuccess(res, result, 'Categories retrieved successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -67,8 +67,8 @@ const getCategoryById = async (
       return sendError(res, 'Category not found', 404);
     }
     sendSuccess(res, category, 'Category retrieved successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -90,8 +90,8 @@ const updateCategory = async (
       return sendError(res, 'Category not found', 404);
     }
     sendSuccess(res, category, 'Category updated successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -108,8 +108,8 @@ const deleteCategory = async (
       return sendError(res, 'Category not found', 404);
     }
     sendSuccess(res, {}, 'Category deleted successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -123,8 +123,8 @@ const updateOrder = async (
     const { categories } = req.body;
     await CategoryService.updateOrder(categories, userId);
     sendSuccess(res, {}, 'Categories order updated successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 

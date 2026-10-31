@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import cron, { type ScheduledTask } from 'node-cron';
 import { temporaryPermissionService } from '../services/temporary-permission.service';
 import logger from '../services/logger.service';
@@ -69,9 +70,9 @@ class PermissionExpiryJob {
           'Permission expiry job completed: no expired permissions found'
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       jobRuns.fail(JOB_NAME, error);
-      logger.error('Error in permission expiry job:', error.message);
+      logger.error('Error in permission expiry job:', asError(error));
     }
   }
 

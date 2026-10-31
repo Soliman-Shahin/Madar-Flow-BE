@@ -1,3 +1,4 @@
+import { errorMessage } from '../shared/errors';
 import { Plan } from '../models/plan.model';
 import { User } from '../models/user.model';
 import { PlanSlug } from '../types/plan.types';
@@ -91,11 +92,11 @@ export class SubscriptionExpiryReminderService {
           metadata: { expiresAt: expiry.toISOString() },
         });
         if (dispatch.created) result.created += 1;
-      } catch (error: any) {
+      } catch (error: unknown) {
         result.failures += 1;
         logger.warn('[SubscriptionExpiryReminder] Reminder dispatch failed', {
           userId: String(user._id),
-          error: error?.message || 'unknown error',
+          error: errorMessage(error) || 'unknown error',
         });
       }
     }

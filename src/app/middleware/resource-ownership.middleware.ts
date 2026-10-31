@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/helper';
 import { AuthenticatedRequest } from './access.middleware';
@@ -123,8 +124,8 @@ export const requireOwnership = (resourceType: ResourceType) => {
       (req as any).resource = resource;
 
       next();
-    } catch (error: any) {
-      logger.error('Error in requireOwnership middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireOwnership middleware:', asError(error));
       return sendError(
         res,
         'Failed to verify resource ownership',
@@ -215,8 +216,8 @@ export const canAccessResource = (resourceType: ResourceType) => {
 
       (req as any).resource = resource;
       next();
-    } catch (error: any) {
-      logger.error('Error in canAccessResource middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in canAccessResource middleware:', asError(error));
       return sendError(
         res,
         'Failed to verify resource access',
@@ -316,8 +317,8 @@ export const requireBulkOwnership = (resourceType: ResourceType) => {
 
       (req as any).resources = resources;
       next();
-    } catch (error: any) {
-      logger.error('Error in requireBulkOwnership middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireBulkOwnership middleware:', asError(error));
       return sendError(
         res,
         'Failed to verify bulk resource ownership',
@@ -344,8 +345,8 @@ async function getResource(
       default:
         throw new Error(`Unknown resource type: ${resourceType}`);
     }
-  } catch (error: any) {
-    logger.error(`Error fetching ${resourceType}:`, error.message);
+  } catch (error: unknown) {
+    logger.error(`Error fetching ${resourceType}:`, asError(error));
     return null;
   }
 }
@@ -370,8 +371,8 @@ async function getResources(
       default:
         throw new Error(`Unknown resource type: ${resourceType}`);
     }
-  } catch (error: any) {
-    logger.error(`Error fetching ${resourceType}s:`, error.message);
+  } catch (error: unknown) {
+    logger.error(`Error fetching ${resourceType}s:`, asError(error));
     return [];
   }
 }

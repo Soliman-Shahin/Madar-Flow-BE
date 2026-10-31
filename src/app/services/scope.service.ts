@@ -1,3 +1,4 @@
+import { errorMessage } from '../shared/errors';
 import { Permission } from '../types/permissions.types';
 import {
   PermissionScope,
@@ -28,8 +29,8 @@ class ScopeService {
       const permissions =
         await permissionCacheService.getUserPermissions(userId);
       return hasScope(permissions, scope);
-    } catch (error: any) {
-      logger.error(`Error checking user scope: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(`Error checking user scope: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -45,8 +46,8 @@ class ScopeService {
       const permissions =
         await permissionCacheService.getUserPermissions(userId);
       return hasAnyScope(permissions, scopes);
-    } catch (error: any) {
-      logger.error(`Error checking user scopes: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(`Error checking user scopes: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -62,8 +63,8 @@ class ScopeService {
       const permissions =
         await permissionCacheService.getUserPermissions(userId);
       return hasAllScopes(permissions, scopes);
-    } catch (error: any) {
-      logger.error(`Error checking user scopes: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(`Error checking user scopes: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -76,8 +77,8 @@ class ScopeService {
       const permissions =
         await permissionCacheService.getUserPermissions(userId);
       return getUserScopes(permissions);
-    } catch (error: any) {
-      logger.error(`Error getting user scopes: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(`Error getting user scopes: ${errorMessage(error)}`);
       return [];
     }
   }
@@ -93,8 +94,8 @@ class ScopeService {
       const permissions =
         await permissionCacheService.getUserPermissions(userId);
       return requiredScopes.filter((scope) => !hasScope(permissions, scope));
-    } catch (error: any) {
-      logger.error(`Error getting missing scopes: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error(`Error getting missing scopes: ${errorMessage(error)}`);
       return requiredScopes;
     }
   }

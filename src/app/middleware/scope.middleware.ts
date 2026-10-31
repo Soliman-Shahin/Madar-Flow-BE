@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/helper';
 import { PlanRequest } from './permission.middleware';
@@ -85,8 +86,8 @@ export const requireScope = (scope: PermissionScope) => {
 
       logger.debug(`Scope granted: user=${planReq.user_id} scope=${scope}`);
       next();
-    } catch (error: any) {
-      logger.error('Error in requireScope middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireScope middleware:', asError(error));
       return sendError(
         res,
         'Authorization check failed',
@@ -144,8 +145,8 @@ export const requireAnyScope = (scopes: PermissionScope[]) => {
       }
 
       next();
-    } catch (error: any) {
-      logger.error('Error in requireAnyScope middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireAnyScope middleware:', asError(error));
       return sendError(
         res,
         'Authorization check failed',
@@ -203,8 +204,8 @@ export const requireAllScopes = (scopes: PermissionScope[]) => {
       }
 
       next();
-    } catch (error: any) {
-      logger.error('Error in requireAllScopes middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireAllScopes middleware:', asError(error));
       return sendError(
         res,
         'Authorization check failed',

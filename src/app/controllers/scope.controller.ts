@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response } from 'express';
 import { scopeService } from '../services/scope.service';
 import { PermissionScope } from '../types/permission-scopes.types';
@@ -19,8 +20,8 @@ class ScopeController {
     try {
       const scopes = scopeService.getAllScopeDetails();
       sendSuccess(res, scopes, 'Scopes retrieved successfully');
-    } catch (error: any) {
-      logger.error('Error getting scopes:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting scopes:', asError(error));
       sendError(res, 'Failed to retrieve scopes', 500, 'INTERNAL_ERROR');
     }
   }
@@ -54,8 +55,8 @@ class ScopeController {
         { category, scopes },
         `Scopes for category "${category}" retrieved successfully`
       );
-    } catch (error: any) {
-      logger.error('Error getting scopes by category:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting scopes by category:', asError(error));
       sendError(res, 'Failed to retrieve scopes', 500, 'INTERNAL_ERROR');
     }
   }
@@ -75,8 +76,8 @@ class ScopeController {
 
       const details = scopeService.getScopeDetails(scope as PermissionScope);
       sendSuccess(res, details, 'Scope details retrieved successfully');
-    } catch (error: any) {
-      logger.error('Error getting scope details:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting scope details:', asError(error));
       sendError(res, 'Failed to retrieve scope details', 500, 'INTERNAL_ERROR');
     }
   }
@@ -104,8 +105,8 @@ class ScopeController {
         { scopes, details: scopeDetails },
         'User scopes retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting user scopes:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting user scopes:', asError(error));
       sendError(res, 'Failed to retrieve user scopes', 500, 'INTERNAL_ERROR');
     }
   }
@@ -139,8 +140,8 @@ class ScopeController {
         { scope, hasScope },
         hasScope ? 'User has scope' : 'User does not have scope'
       );
-    } catch (error: any) {
-      logger.error('Error checking user scope:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error checking user scope:', asError(error));
       sendError(res, 'Failed to check user scope', 500, 'INTERNAL_ERROR');
     }
   }
@@ -183,8 +184,8 @@ class ScopeController {
         },
         'Missing scopes retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting missing scopes:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting missing scopes:', asError(error));
       sendError(
         res,
         'Failed to retrieve missing scopes',
@@ -214,8 +215,8 @@ class ScopeController {
         { scope, permissions, count: permissions.length },
         'Scope expanded successfully'
       );
-    } catch (error: any) {
-      logger.error('Error expanding scope:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error expanding scope:', asError(error));
       sendError(res, 'Failed to expand scope', 500, 'INTERNAL_ERROR');
     }
   }

@@ -1,3 +1,4 @@
+import { asError, errorMessage } from '../shared/errors';
 /**
  * Seed Script: Initialize Default Plans
  *
@@ -41,9 +42,9 @@ async function seedPlans() {
     });
 
     process.exit(0);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('❌ Error seeding plans:');
-    logger.error(error);
+    logger.error(errorMessage(error));
     console.error('Full error:', error);
     process.exit(1);
   } finally {

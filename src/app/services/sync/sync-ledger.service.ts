@@ -1,3 +1,4 @@
+import { errorCode } from '../../shared/errors';
 import logger from '../logger.service';
 import { Expense } from '../../models/expense.model';
 import { Category } from '../../models/category.model';
@@ -128,8 +129,8 @@ export class SyncOperationLedger {
         },
         { upsert: true, returnDocument: 'after' }
       ).lean();
-    } catch (error: any) {
-      if (error?.code === 11000) {
+    } catch (error: unknown) {
+      if (errorCode(error) === 11000) {
         const winner = await SyncRegistration.findOne({
           user: userObjectId,
           clientOperationId: operationId,
@@ -223,8 +224,8 @@ export class SyncOperationLedger {
           },
           { upsert: true, returnDocument: 'after' }
         ).lean();
-      } catch (error: any) {
-        if (error?.code === 11000) {
+      } catch (error: unknown) {
+        if (errorCode(error) === 11000) {
           failure = await SyncFailure.findOneAndUpdate(
             { ...identityFilter, terminal: false },
             { $inc: { attemptCount: 1 } },

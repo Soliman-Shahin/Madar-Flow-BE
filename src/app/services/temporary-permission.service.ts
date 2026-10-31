@@ -2,6 +2,8 @@ import {
   BadRequestError,
   ConflictError,
   NotFoundError,
+  errorMessage,
+  asError,
 } from '../shared/errors';
 import mongoose from 'mongoose';
 import {
@@ -90,8 +92,8 @@ class TemporaryPermissionService {
       );
 
       return tempPermission;
-    } catch (error: any) {
-      logger.error('Error granting temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error granting temporary permission:', asError(error));
       throw error;
     }
   }
@@ -143,8 +145,8 @@ class TemporaryPermissionService {
       );
 
       return tempPermission;
-    } catch (error: any) {
-      logger.error('Error revoking temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error revoking temporary permission:', asError(error));
       throw error;
     }
   }
@@ -155,8 +157,8 @@ class TemporaryPermissionService {
   async getActivePermissions(userId: string): Promise<ITemporaryPermission[]> {
     try {
       return await TemporaryPermission.findActiveForUser(userId);
-    } catch (error: any) {
-      logger.error('Error getting active permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting active permissions:', asError(error));
       return [];
     }
   }
@@ -167,8 +169,8 @@ class TemporaryPermissionService {
   async getUserPermissions(userId: string): Promise<ITemporaryPermission[]> {
     try {
       return await TemporaryPermission.find({ userId }).sort({ createdAt: -1 });
-    } catch (error: any) {
-      logger.error('Error getting user permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting user permissions:', asError(error));
       return [];
     }
   }
@@ -191,8 +193,8 @@ class TemporaryPermissionService {
       });
 
       return count > 0;
-    } catch (error: any) {
-      logger.error('Error checking temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error checking temporary permission:', asError(error));
       return false;
     }
   }
@@ -204,8 +206,8 @@ class TemporaryPermissionService {
     try {
       const tempPermissions = await this.getActivePermissions(userId);
       return tempPermissions.map((tp) => tp.permission);
-    } catch (error: any) {
-      logger.error('Error getting active permissions list:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting active permissions list:', asError(error));
       return [];
     }
   }
@@ -249,8 +251,8 @@ class TemporaryPermissionService {
       }
 
       return processedCount;
-    } catch (error: any) {
-      logger.error('Error processing expired permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error processing expired permissions:', asError(error));
       throw error;
     }
   }
@@ -263,8 +265,8 @@ class TemporaryPermissionService {
   ): Promise<ITemporaryPermission[]> {
     try {
       return await TemporaryPermission.findExpiringSoon(hoursFromNow);
-    } catch (error: any) {
-      logger.error('Error getting expiring permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting expiring permissions:', asError(error));
       return [];
     }
   }
@@ -334,8 +336,8 @@ class TemporaryPermissionService {
       );
 
       return tempPermission;
-    } catch (error: any) {
-      logger.error('Error extending temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error extending temporary permission:', asError(error));
       throw error;
     }
   }
@@ -385,10 +387,10 @@ class TemporaryPermissionService {
         revoked,
         expiringSoon,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
         'Error getting temporary permission statistics:',
-        error.message
+        asError(error)
       );
       throw error;
     }

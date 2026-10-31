@@ -1,3 +1,4 @@
+import { asError, errorMessage, errorCode } from '../shared/errors';
 import logger from './logger.service';
 import { SyncOperationLedger } from './sync/sync-ledger.service';
 import { SyncConflictService } from './sync/sync-conflict.service';
@@ -206,9 +207,9 @@ export class SyncService {
       });
 
       return response;
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Pull error:', error);
-      throw new Error(`Failed to pull sync data: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Pull error:', asError(error));
+      throw new Error(`Failed to pull sync data: ${errorMessage(error)}`);
     }
   }
 
@@ -293,15 +294,15 @@ export class SyncService {
             await this.ledger.clearObservedFailure(userId, processingEntity);
             processed++;
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           await this.ledger.recordObservedFailure(userId, processingEntity);
           logger.error(
             `❌ [SYNC] Error processing entity ${entity._id}:`,
-            error
+            asError(error)
           );
           errors.push({
             operationId: entity._operationId,
-            reason: error.message || 'SYNC_PROCESSING_FAILED',
+            reason: errorMessage(error) || 'SYNC_PROCESSING_FAILED',
           });
         }
       }
@@ -318,9 +319,9 @@ export class SyncService {
         errors,
         receipts,
       };
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Push error:', error);
-      throw new Error(`Failed to push sync data: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Push error:', asError(error));
+      throw new Error(`Failed to push sync data: ${errorMessage(error)}`);
     }
   }
 
@@ -353,8 +354,8 @@ export class SyncService {
         },
         { upsert: true, returnDocument: 'before' }
       ).lean();
-    } catch (error: any) {
-      if (error?.code === 11000) {
+    } catch (error: unknown) {
+      if (errorCode(error) === 11000) {
         const duplicate = await SyncConflict.findOne({ dedupeKey })
           .select('_id')
           .lean();
@@ -542,8 +543,11 @@ export class SyncService {
       }
 
       return { conflict: false, entity };
-    } catch (error: any) {
-      logger.error(`❌ [SYNC] Error processing ${_entityType}:${_id}:`, error);
+    } catch (error: unknown) {
+      logger.error(
+        `❌ [SYNC] Error processing ${_entityType}:${_id}:`,
+        asError(error)
+      );
       throw error;
     }
   }
@@ -600,10 +604,10 @@ export class SyncService {
             ? entityId
             : undefined;
       if (correlationId) idMap.set(correlationId, entity._id.toString());
-    } catch (error: any) {
+    } catch (error: unknown) {
       // A concurrent retry may win the unique owner/clientId insert. Treat that
       // duplicate as the already-created logical entity.
-      if (error?.code !== 11000) throw error;
+      if (errorCode(error) !== 11000) throw error;
       const correlationId =
         typeof data._clientId === 'string' &&
         data._clientId.startsWith('offline_')
@@ -697,9 +701,9 @@ export class SyncService {
       }
 
       return metadata.toObject();
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Get metadata error:', error);
-      throw new Error(`Failed to get sync metadata: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Get metadata error:', asError(error));
+      throw new Error(`Failed to get sync metadata: ${errorMessage(error)}`);
     }
   }
 
@@ -720,9 +724,9 @@ export class SyncService {
         },
         { upsert: true }
       );
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Update metadata error:', error);
-      throw new Error(`Failed to update sync metadata: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Update metadata error:', asError(error));
+      throw new Error(`Failed to update sync metadata: ${errorMessage(error)}`);
     }
   }
 
@@ -746,19 +750,19 @@ export class SyncService {
             entity: result.entity,
             conflict: result.conflict,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           results.push({
             success: false,
             entity,
-            error: error.message,
+            error: errorMessage(error),
           });
         }
       }
 
       return { success: true, results };
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Bulk sync error:', error);
-      throw new Error(`Failed to perform bulk sync: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Bulk sync error:', asError(error));
+      throw new Error(`Failed to perform bulk sync: ${errorMessage(error)}`);
     }
   }
 
@@ -786,9 +790,9 @@ export class SyncService {
       });
 
       logger.info(`🧹 [SYNC] Cleaned up data older than ${olderThanDays} days`);
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Cleanup error:', error);
-      throw new Error(`Failed to cleanup sync data: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Cleanup error:', asError(error));
+      throw new Error(`Failed to cleanup sync data: ${errorMessage(error)}`);
     }
   }
 }

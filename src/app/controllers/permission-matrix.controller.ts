@@ -1,3 +1,4 @@
+import { errorMessage } from '../shared/errors';
 import { Request, Response } from 'express';
 import permissionExportService from '../services/permission-export.service';
 import { PlanSlug } from '../types/plan.types';
@@ -28,11 +29,11 @@ class PermissionMatrixController {
         success: true,
         data: matrix,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to build permission matrix',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -83,11 +84,11 @@ class PermissionMatrixController {
         `attachment; filename="${filename}"`
       );
       res.status(200).send(content);
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to export permission matrix',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -123,11 +124,11 @@ class PermissionMatrixController {
         success: true,
         data: comparison,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to compare plans',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -163,11 +164,11 @@ class PermissionMatrixController {
         success: true,
         data: comparison,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to compare roles',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -192,11 +193,11 @@ class PermissionMatrixController {
         success: true,
         data,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to get visualization data',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -265,11 +266,11 @@ class PermissionMatrixController {
         success: true,
         data: summary,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to get permission summary',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -311,11 +312,11 @@ class PermissionMatrixController {
           count: plan.permissions.length,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to get plan permissions',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }
@@ -354,11 +355,11 @@ class PermissionMatrixController {
           count: roleData.permissions.length,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       res.status(500).json({
         success: false,
         message: 'Failed to get role permissions',
-        error: error.message,
+        error: errorMessage(error),
       });
     }
   }

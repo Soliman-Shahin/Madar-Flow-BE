@@ -1,3 +1,4 @@
+import { errorCode } from '../shared/errors';
 import { Types } from 'mongoose';
 import {
   Notification,
@@ -56,8 +57,8 @@ export class NotificationService {
         dedupeKey: input.dedupeKey,
         metadata: input.metadata,
       });
-    } catch (error: any) {
-      if (error?.code === 11000) return { created: false, channels };
+    } catch (error: unknown) {
+      if (errorCode(error) === 11000) return { created: false, channels };
       throw error;
     }
     const userObjectId = new Types.ObjectId(input.userId);

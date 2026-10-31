@@ -42,15 +42,12 @@ async function seed() {
       type: 'outcome',
     });
   expect(cat.status).toBe(201);
-  const exp = await request(app)
-    .post('/v1/expenses')
-    .set(auth(a))
-    .send({
-      description: 'A secret',
-      amount: 12,
-      category: cat.body.data._id,
-      date: new Date().toISOString(),
-    });
+  const exp = await request(app).post('/v1/expenses').set(auth(a)).send({
+    description: 'A secret',
+    amount: 12,
+    category: cat.body.data._id,
+    date: new Date().toISOString(),
+  });
   expect([200, 201]).toContain(exp.status);
   return {
     a,
@@ -123,15 +120,12 @@ describe('cross-user isolation (IDOR)', () => {
 
   it("an expense cannot be created against another user's category", async () => {
     const { b, catId } = await seed();
-    const res = await request(app)
-      .post('/v1/expenses')
-      .set(auth(b))
-      .send({
-        description: 'cross ref',
-        amount: 5,
-        category: catId,
-        date: new Date().toISOString(),
-      });
+    const res = await request(app).post('/v1/expenses').set(auth(b)).send({
+      description: 'cross ref',
+      amount: 5,
+      category: catId,
+      date: new Date().toISOString(),
+    });
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });

@@ -84,7 +84,7 @@ categorySchema.pre(
           { $set: { category: null } }
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       throw error;
     }
   }

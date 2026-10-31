@@ -1,3 +1,4 @@
+import { asError } from '../shared/errors';
 import logger from '../services/logger.service';
 import { Request, Response, NextFunction } from 'express';
 import {
@@ -200,7 +201,7 @@ export function createEncryptionMiddleware(customOptions?: EncryptionOptions) {
         const encryptedBody = encryptFieldsDeep(body, SENSITIVE_FIELDS);
         return originalJson(encryptedBody);
       } catch (error) {
-        logger.error("❌ Response field encryption error:", error);
+        logger.error("❌ Response field encryption error:", asError(error));
         // Fall back to unencrypted response
         return originalJson(body);
       }

@@ -1,3 +1,4 @@
+import { errorMessage } from '../shared/errors';
 import { User, UserDocument } from '../models/user.model';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -49,10 +50,10 @@ export class UserService {
         message: 'A new authenticated session was created.',
         metadata: { authenticationMethod, occurredAt },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.warn('Security login notification dispatch failed', {
         userId: user._id.toString(),
-        error: error?.message || 'unknown error',
+        error: errorMessage(error) || 'unknown error',
       });
     }
 

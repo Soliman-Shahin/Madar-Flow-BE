@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request } from 'express';
 import {
   AuditLog,
@@ -93,8 +94,8 @@ class AuditLogService {
       }
 
       return auditLog;
-    } catch (error: any) {
-      logger.error('Failed to create audit log:', error.message);
+    } catch (error: unknown) {
+      logger.error('Failed to create audit log:', asError(error));
       throw error;
     }
   }
@@ -239,8 +240,8 @@ class AuditLogService {
       ]);
 
       return { logs: logs as IAuditLog[], total };
-    } catch (error: any) {
-      logger.error('Failed to query audit logs:', error.message);
+    } catch (error: unknown) {
+      logger.error('Failed to query audit logs:', asError(error));
       throw error;
     }
   }
@@ -341,8 +342,8 @@ class AuditLogService {
         successRate: totalLogs > 0 ? (successCount / totalLogs) * 100 : 0,
         topActors: result.topActors,
       };
-    } catch (error: any) {
-      logger.error('Failed to get audit log stats:', error.message);
+    } catch (error: unknown) {
+      logger.error('Failed to get audit log stats:', asError(error));
       throw error;
     }
   }
@@ -363,8 +364,8 @@ class AuditLogService {
         `Deleted ${result.deletedCount} audit logs older than ${olderThanDays} days`
       );
       return result.deletedCount || 0;
-    } catch (error: any) {
-      logger.error('Failed to delete old audit logs:', error.message);
+    } catch (error: unknown) {
+      logger.error('Failed to delete old audit logs:', asError(error));
       throw error;
     }
   }

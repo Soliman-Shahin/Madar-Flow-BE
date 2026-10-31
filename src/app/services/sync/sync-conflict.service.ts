@@ -1,3 +1,4 @@
+import { asError, errorMessage } from '../../shared/errors';
 import logger from '../logger.service';
 import { Expense } from '../../models/expense.model';
 import { Category } from '../../models/category.model';
@@ -216,9 +217,9 @@ export class SyncConflictService {
         entity: resolvedEntity,
         resolution: 'resolved',
       };
-    } catch (error: any) {
-      logger.error('❌ [SYNC] Conflict resolution error:', error);
-      throw new Error(`Failed to resolve conflict: ${error.message}`);
+    } catch (error: unknown) {
+      logger.error('❌ [SYNC] Conflict resolution error:', asError(error));
+      throw new Error(`Failed to resolve conflict: ${errorMessage(error)}`);
     }
   }
 

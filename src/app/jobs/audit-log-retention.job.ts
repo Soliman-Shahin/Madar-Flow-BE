@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import cron, { type ScheduledTask } from 'node-cron';
 import logger from '../services/logger.service';
 import { auditLogService } from '../services/audit-log.service';
@@ -56,12 +57,9 @@ export class AuditLogRetentionJob {
         deleted,
       });
       return deleted;
-    } catch (error: any) {
+    } catch (error: unknown) {
       jobRuns.fail(JOB_NAME, error);
-      logger.error(
-        '[AuditLogRetentionJob] Retention failed',
-        error?.message || 'unknown error'
-      );
+      logger.error('[AuditLogRetentionJob] Retention failed', asError(error));
       return 0;
     } finally {
       this.executing = false;

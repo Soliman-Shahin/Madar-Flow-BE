@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { sendError, sendSuccess } from '../shared/helper';
 import { CustomRequest } from '../types/custom-request';
 import { ExpenseService } from '../services/expense.service';
-import { AppError } from '../shared/errors';
+import { AppError, errorMessage, asError } from '../shared/errors';
 
 // Create a new expense/transaction
 // Note: Plan limit enforcement is handled upstream by:
@@ -13,7 +13,7 @@ export const createExpense = async (req: CustomRequest, res: Response) => {
     const user = req.user_id || '';
     const expense = await ExpenseService.createExpense(req.body, user, req);
     sendSuccess(res, expense, 'Expense created successfully', 201);
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Propagate AppError subclasses (PlanLimitError, etc.) with correct status code
     if (error instanceof AppError) {
       return sendError(
@@ -24,7 +24,7 @@ export const createExpense = async (req: CustomRequest, res: Response) => {
         error.details
       );
     }
-    sendError(res, error.message);
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -81,9 +81,9 @@ export const getExpenses = async (req: CustomRequest, res: Response) => {
       // Return just the data array for simple queries
       sendSuccess(res, expenses.data || expenses);
     }
-  } catch (error: any) {
-    logger.error('❌ Error in getExpenses:', error);
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    logger.error('❌ Error in getExpenses:', asError(error));
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -96,8 +96,8 @@ export const getExpenseById = async (req: CustomRequest, res: Response) => {
       return sendError(res, 'Expense not found', 404);
     }
     sendSuccess(res, expense);
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -115,8 +115,8 @@ export const updateExpense = async (req: CustomRequest, res: Response) => {
       return sendError(res, 'Expense not found', 404);
     }
     sendSuccess(res, updatedExpense, 'Expense updated successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -129,8 +129,8 @@ export const deleteExpense = async (req: CustomRequest, res: Response) => {
       return sendError(res, 'Expense not found', 404);
     }
     sendSuccess(res, {}, 'Expense deleted successfully');
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };
 
@@ -147,7 +147,7 @@ export const getExpenseTotals = async (req: CustomRequest, res: Response) => {
       String(endDate)
     );
     sendSuccess(res, result);
-  } catch (error: any) {
-    sendError(res, error.message);
+  } catch (error: unknown) {
+    sendError(res, errorMessage(error));
   }
 };

@@ -1,3 +1,4 @@
+import { errorStatus, errorMessage, errorCode } from '../shared/errors';
 import { Request, RequestHandler, Response, Router } from 'express';
 import crypto from 'crypto';
 import passport from 'passport';
@@ -435,10 +436,10 @@ router.post('/auth/google/native', async (req: Request, res: Response) => {
     if (!user) {
       try {
         assertNewAccountConsent(req.body);
-      } catch (error: any) {
-        return res.status(error.statusCode || 400).json({
+      } catch (error: unknown) {
+        return res.status(errorStatus(error) || 400).json({
           success: false,
-          error: { message: error.message, code: error.code },
+          error: { message: errorMessage(error), code: errorCode(error) },
         });
       }
       user = new (User as any)({

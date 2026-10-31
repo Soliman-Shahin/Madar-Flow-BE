@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response } from 'express';
 import { permissionCacheService } from '../services/permission-cache.service';
 import { sendSuccess, sendError } from '../shared/helper';
@@ -17,8 +18,8 @@ class CacheController {
     try {
       const stats = permissionCacheService.getStats();
       sendSuccess(res, stats, 'Cache statistics retrieved successfully');
-    } catch (error: any) {
-      logger.error('Error getting cache stats:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting cache stats:', asError(error));
       sendError(
         res,
         'Failed to retrieve cache statistics',
@@ -44,8 +45,8 @@ class CacheController {
         { userId, invalidated: true },
         `Cache invalidated for user ${userId}`
       );
-    } catch (error: any) {
-      logger.error('Error invalidating user cache:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error invalidating user cache:', asError(error));
       sendError(res, 'Failed to invalidate user cache', 500, 'INTERNAL_ERROR');
     }
   }
@@ -75,8 +76,8 @@ class CacheController {
         { userIds, count: userIds.length, invalidated: true },
         `Cache invalidated for ${userIds.length} users`
       );
-    } catch (error: any) {
-      logger.error('Error invalidating users cache:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error invalidating users cache:', asError(error));
       sendError(res, 'Failed to invalidate users cache', 500, 'INTERNAL_ERROR');
     }
   }
@@ -99,8 +100,8 @@ class CacheController {
         { planSlug, invalidated: true },
         `Cache invalidated for plan ${planSlug}`
       );
-    } catch (error: any) {
-      logger.error('Error invalidating plan cache:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error invalidating plan cache:', asError(error));
       sendError(res, 'Failed to invalidate plan cache', 500, 'INTERNAL_ERROR');
     }
   }
@@ -114,8 +115,8 @@ class CacheController {
       permissionCacheService.flush();
 
       sendSuccess(res, { flushed: true }, 'Cache completely flushed');
-    } catch (error: any) {
-      logger.error('Error flushing cache:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error flushing cache:', asError(error));
       sendError(res, 'Failed to flush cache', 500, 'INTERNAL_ERROR');
     }
   }
@@ -145,8 +146,8 @@ class CacheController {
         { userIds, count: userIds.length, warmedUp: true },
         `Cache warmed up for ${userIds.length} users`
       );
-    } catch (error: any) {
-      logger.error('Error warming up cache:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error warming up cache:', asError(error));
       sendError(res, 'Failed to warm up cache', 500, 'INTERNAL_ERROR');
     }
   }
@@ -173,8 +174,8 @@ class CacheController {
         },
         'User cache status retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error checking user cache:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error checking user cache:', asError(error));
       sendError(res, 'Failed to check user cache', 500, 'INTERNAL_ERROR');
     }
   }

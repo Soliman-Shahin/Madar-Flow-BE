@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/helper';
 import { Permission } from '../types/permissions.types';
@@ -86,8 +87,8 @@ export const requirePermission = (permission: Permission) => {
         `Permission granted: user=${planReq.user_id} permission=${permission}`
       );
       next();
-    } catch (error: any) {
-      logger.error('Error in requirePermission middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requirePermission middleware:', asError(error));
       return sendError(
         res,
         'Authorization check failed',
@@ -137,8 +138,8 @@ export const requireAnyPermission = (permissions: Permission[]) => {
       }
 
       next();
-    } catch (error: any) {
-      logger.error('Error in requireAnyPermission middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireAnyPermission middleware:', asError(error));
       return sendError(
         res,
         'Authorization check failed',
@@ -187,8 +188,11 @@ export const requireAllPermissions = (permissions: Permission[]) => {
       }
 
       next();
-    } catch (error: any) {
-      logger.error('Error in requireAllPermissions middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error(
+        'Error in requireAllPermissions middleware:',
+        asError(error)
+      );
       return sendError(
         res,
         'Authorization check failed',

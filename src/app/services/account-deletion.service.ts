@@ -220,7 +220,7 @@ export class AccountDeletionService {
         ),
       ]);
       await User.deleteOne({ _id: userId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
         'Account deletion incomplete; account remains disabled',
         error instanceof Error ? error : undefined,

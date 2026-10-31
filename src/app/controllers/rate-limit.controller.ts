@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/access.middleware';
 import { getRateLimitInfo } from '../middleware/role-rate-limit.middleware';
@@ -44,8 +45,8 @@ class RateLimitController {
         },
         'Rate limit information retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting rate limits:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting rate limits:', asError(error));
       sendError(res, 'Failed to retrieve rate limits', 500, 'INTERNAL_ERROR');
     }
   }
@@ -81,8 +82,8 @@ class RateLimitController {
         },
         'Rate limit status retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting rate limit status:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting rate limit status:', asError(error));
       sendError(
         res,
         'Failed to retrieve rate limit status',

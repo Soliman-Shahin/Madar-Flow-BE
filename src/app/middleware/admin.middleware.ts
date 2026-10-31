@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import { Request, Response, NextFunction } from 'express';
 import { sendError } from '../shared/helper';
 import logger from '../services/logger.service';
@@ -83,8 +84,8 @@ export const requireRole = (...allowedRoles: UserRole[]) => {
         `requireRole: access granted. user=${userId} role=${userRole}`
       );
       next();
-    } catch (error: any) {
-      logger.error('Error in requireRole middleware:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error in requireRole middleware:', asError(error));
       sendError(
         res,
         'Internal server error during authorization',

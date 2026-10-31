@@ -407,3 +407,33 @@ export default {
   isOperationalError,
   toAppError,
 };
+
+/** Safe accessors for values caught as `unknown`. */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : 'Unknown error';
+}
+
+function errorField<T>(
+  error: unknown,
+  key: string,
+  kind: string
+): T | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const value = (error as Record<string, unknown>)[key];
+  return typeof value === kind ? (value as T) : undefined;
+}
+
+export const errorCode = (error: unknown): string | number | undefined =>
+  errorField<string>(error, 'code', 'string') ??
+  errorField<number>(error, 'code', 'number');
+
+export const errorStatus = (error: unknown): number | undefined =>
+  errorField<number>(error, 'statusCode', 'number');
+
+export function asError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(errorMessage(error));
+}

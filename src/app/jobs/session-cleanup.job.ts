@@ -1,3 +1,4 @@
+import { errorMessage, asError } from '../shared/errors';
 import cron, { type ScheduledTask } from 'node-cron';
 import logger from '../services/logger.service';
 import {
@@ -42,12 +43,9 @@ export class SessionCleanupJob {
         await SessionCleanupService.cleanupExpiredSessions(referenceTime);
       logger.info('[SessionCleanupJob] Cleanup completed', result);
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       jobRuns.fail(JOB_NAME, error);
-      logger.error(
-        '[SessionCleanupJob] Cleanup failed',
-        error?.message || 'unknown error'
-      );
+      logger.error('[SessionCleanupJob] Cleanup failed', asError(error));
       return { matchedUsers: 0, modifiedUsers: 0 };
     } finally {
       this.executing = false;

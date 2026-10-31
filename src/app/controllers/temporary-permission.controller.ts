@@ -1,4 +1,4 @@
-import { AppError } from '../shared/errors';
+import { AppError, errorMessage, asError } from '../shared/errors';
 import { Request, Response } from 'express';
 import { temporaryPermissionService } from '../services/temporary-permission.service';
 import { Permission } from '../types/permissions.types';
@@ -58,12 +58,12 @@ class TemporaryPermissionController {
         'Temporary permission granted successfully',
         201
       );
-    } catch (error: any) {
-      logger.error('Error granting temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error granting temporary permission:', asError(error));
       if (error instanceof AppError) {
         return sendError(res, error.message, error.statusCode, error.code);
       }
-      sendError(res, error.message, 500, 'INTERNAL_ERROR');
+      sendError(res, errorMessage(error), 500, 'INTERNAL_ERROR');
     }
   }
 
@@ -95,12 +95,12 @@ class TemporaryPermissionController {
         tempPermission,
         'Temporary permission revoked successfully'
       );
-    } catch (error: any) {
-      logger.error('Error revoking temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error revoking temporary permission:', asError(error));
       if (error instanceof AppError) {
         return sendError(res, error.message, error.statusCode, error.code);
       }
-      sendError(res, error.message, 500, 'INTERNAL_ERROR');
+      sendError(res, errorMessage(error), 500, 'INTERNAL_ERROR');
     }
   }
 
@@ -142,12 +142,12 @@ class TemporaryPermissionController {
         tempPermission,
         'Temporary permission extended successfully'
       );
-    } catch (error: any) {
-      logger.error('Error extending temporary permission:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error extending temporary permission:', asError(error));
       if (error instanceof AppError) {
         return sendError(res, error.message, error.statusCode, error.code);
       }
-      sendError(res, error.message, 500, 'INTERNAL_ERROR');
+      sendError(res, errorMessage(error), 500, 'INTERNAL_ERROR');
     }
   }
 
@@ -168,8 +168,8 @@ class TemporaryPermissionController {
         permissions,
         'User temporary permissions retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting user temporary permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting user temporary permissions:', asError(error));
       sendError(res, 'Failed to retrieve permissions', 500, 'INTERNAL_ERROR');
     }
   }
@@ -195,8 +195,8 @@ class TemporaryPermissionController {
         permissions,
         'Your temporary permissions retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting my temporary permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting my temporary permissions:', asError(error));
       sendError(res, 'Failed to retrieve permissions', 500, 'INTERNAL_ERROR');
     }
   }
@@ -223,8 +223,8 @@ class TemporaryPermissionController {
         },
         'Expiring permissions retrieved successfully'
       );
-    } catch (error: any) {
-      logger.error('Error getting expiring permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error getting expiring permissions:', asError(error));
       sendError(res, 'Failed to retrieve permissions', 500, 'INTERNAL_ERROR');
     }
   }
@@ -238,10 +238,10 @@ class TemporaryPermissionController {
       const stats = await temporaryPermissionService.getStatistics();
 
       sendSuccess(res, stats, 'Statistics retrieved successfully');
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
         'Error getting temporary permission statistics:',
-        error.message
+        asError(error)
       );
       sendError(res, 'Failed to retrieve statistics', 500, 'INTERNAL_ERROR');
     }
@@ -261,8 +261,8 @@ class TemporaryPermissionController {
         { processedCount },
         `Processed ${processedCount} expired permissions`
       );
-    } catch (error: any) {
-      logger.error('Error processing expired permissions:', error.message);
+    } catch (error: unknown) {
+      logger.error('Error processing expired permissions:', asError(error));
       sendError(
         res,
         'Failed to process expired permissions',

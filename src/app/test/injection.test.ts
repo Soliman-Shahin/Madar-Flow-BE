@@ -63,15 +63,12 @@ describe('operator and regex injection', () => {
       .post('/v1/categories/create')
       .set(auth(a))
       .send({ title: 'A only', icon: 'x', color: '#000000', type: 'outcome' });
-    await request(app)
-      .post('/v1/expenses')
-      .set(auth(a))
-      .send({
-        description: 'A secret meal',
-        amount: 9,
-        category: cat.body.data._id,
-        date: new Date().toISOString(),
-      });
+    await request(app).post('/v1/expenses').set(auth(a)).send({
+      description: 'A secret meal',
+      amount: 9,
+      category: cat.body.data._id,
+      date: new Date().toISOString(),
+    });
 
     const probes = [
       '/v1/expenses?category[$ne]=000000000000000000000000',
