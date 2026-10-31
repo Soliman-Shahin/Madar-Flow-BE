@@ -29,7 +29,7 @@ export const enhancedErrorHandler = (
   // Extract request context for logging
   const ip = req.ip || req.socket.remoteAddress;
   const context = {
-    requestId: (req as any).id,
+    requestId: req.id,
     ip,
     method: req.method,
     path: req.path,

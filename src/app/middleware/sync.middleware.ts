@@ -179,7 +179,7 @@ export const rateLimitSync = (
       // Must run after authentication: without an identity every caller would
       // share one counter and a single busy hour would lock everyone out.
       const identity =
-        (req as any).user?._id || (req as any).user_id || req.ip || 'unknown';
+        (req as any).user?._id || req.user_id || req.ip || 'unknown';
       const now = Date.now();
       const key = `sync_${String(identity)}`;
 

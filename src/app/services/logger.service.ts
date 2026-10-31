@@ -253,8 +253,8 @@ class Logger {
    */
   public static extractRequestContext(req: Request): LogContext {
     return {
-      requestId: (req as any).id || Math.random().toString(36).substr(2, 9),
-      userId: (req as any).user_id,
+      requestId: req.id || Math.random().toString(36).substr(2, 9),
+      userId: req.user_id,
       ip: req.ip || req.socket.remoteAddress,
       method: req.method,
       path: req.path,

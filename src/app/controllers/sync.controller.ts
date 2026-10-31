@@ -24,7 +24,7 @@ export class SyncController {
   ): Promise<void> {
     try {
       logger.info('Pull data controller called');
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       logger.info('User ID:', userId);
 
       if (!userId) {
@@ -69,7 +69,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const { entities } = req.body;
 
       if (!entities || !Array.isArray(entities)) {
@@ -97,7 +97,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const { entities } = req.body;
 
       if (!entities || !Array.isArray(entities)) {
@@ -125,7 +125,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const conflicts = await this.syncService.getConflicts(userId);
       sendSuccess(res, conflicts, 'Conflicts retrieved successfully');
     } catch (error) {
@@ -139,7 +139,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const conflictData: ConflictResolutionRequest = req.body;
 
       if (
@@ -174,7 +174,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const metadata = await this.syncService.getSyncMetadata(userId);
       sendSuccess(res, metadata, 'Sync metadata retrieved successfully');
     } catch (error) {
@@ -188,7 +188,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const updates = req.body;
 
       await this.syncService.updateSyncMetadata(userId, updates);
@@ -206,7 +206,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const { olderThanDays } = req.query;
       const days = olderThanDays ? parseInt(olderThanDays as string) : 30;
 
@@ -225,7 +225,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
 
       // Update metadata to indicate syncing
       await this.syncService.updateSyncMetadata(userId, { isSyncing: true });
@@ -252,7 +252,7 @@ export class SyncController {
       );
     } catch (error) {
       // Update metadata to indicate sync error
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       if (userId) {
         await this.syncService.updateSyncMetadata(userId, { isSyncing: false });
       }
@@ -268,7 +268,7 @@ export class SyncController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = (req as any).user?._id || (req as any).user_id;
+      const userId = (req as any).user?._id || req.user_id;
       const metadata = await this.syncService.getSyncMetadata(userId);
       const conflicts = await this.syncService.getConflicts(userId);
 

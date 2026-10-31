@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import { AuthenticationError } from '../shared/errors';
 import { sendError, sendSuccess } from '../shared/helper';
 import {
   AnalyticsReportScheduleInput,
@@ -37,6 +38,12 @@ const scheduleInput = z
       });
   });
 
+/** The access-token middleware sets user_id; fail closed if a route is ever mounted without it. */
+const actorId = (req: Request): string => {
+  if (!req.user_id) throw new AuthenticationError();
+  return req.user_id;
+};
+
 const scheduleId = (req: Request) =>
   Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
 
@@ -55,7 +62,7 @@ export const analyticsReportScheduleController = {
     try {
       return sendSuccess(
         res,
-        await analyticsReportScheduleService.list((req as any).user_id),
+        await analyticsReportScheduleService.list(actorId(req)),
         'Analytics report schedules retrieved successfully'
       );
     } catch (error) {
@@ -77,7 +84,7 @@ export const analyticsReportScheduleController = {
       return sendSuccess(
         res,
         await analyticsReportScheduleService.create(
-          (req as any).user_id,
+          actorId(req),
           parsed.data as AnalyticsReportScheduleInput
         ),
         'Analytics report schedule created successfully'
@@ -101,7 +108,7 @@ export const analyticsReportScheduleController = {
       return sendSuccess(
         res,
         await analyticsReportScheduleService.update(
-          (req as any).user_id,
+          actorId(req),
           scheduleId(req),
           parsed.data as AnalyticsReportScheduleInput
         ),
@@ -128,7 +135,7 @@ export const analyticsReportScheduleController = {
       return sendSuccess(
         res,
         await analyticsReportScheduleService.setActive(
-          (req as any).user_id,
+          actorId(req),
           scheduleId(req),
           parsed.data.active
         ),
@@ -144,7 +151,7 @@ export const analyticsReportScheduleController = {
   async cancel(req: Request, res: Response, next: NextFunction) {
     try {
       const cancelled = await analyticsReportScheduleService.cancel(
-        (req as any).user_id,
+        actorId(req),
         scheduleId(req)
       );
       if (!cancelled)

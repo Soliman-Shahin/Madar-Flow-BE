@@ -9,7 +9,8 @@
     "src/**/*.spec.ts",
     "src/**/__tests__/**/*.ts",
     "src/app/test/**/*.ts",
-    "src/app/tests/**/*.ts"
+    "src/app/tests/**/*.ts",
+    "src/app/types/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

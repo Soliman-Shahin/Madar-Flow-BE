@@ -58,7 +58,7 @@ class RateLimiter {
 
   private getKey(req: Request): string {
     // Use user ID if authenticated, otherwise use IP
-    const userId = (req as any).user_id;
+    const userId = req.user_id;
     return userId || req.ip || req.socket.remoteAddress || 'unknown';
   }
 

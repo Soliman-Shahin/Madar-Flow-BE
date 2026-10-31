@@ -34,13 +34,13 @@ export const requestLogger = (
 
   // Generate unique request ID
   const requestId = Math.random().toString(36).substr(2, 9);
-  (req as any).id = requestId;
+  req.id = requestId;
   res.setHeader('X-Request-ID', requestId);
 
   // Log request start
   const context = {
     requestId,
-    userId: (req as any).user_id,
+    userId: req.user_id,
     ip: req.ip || req.socket.remoteAddress,
     method: req.method,
     path: req.path,
@@ -57,7 +57,7 @@ export const requestLogger = (
     const duration = Date.now() - startTime;
 
     // Extract user ID if available
-    const userId = (req as any).user_id;
+    const userId = req.user_id;
 
     // Prepare log data
     const logData: RequestLogData = {
