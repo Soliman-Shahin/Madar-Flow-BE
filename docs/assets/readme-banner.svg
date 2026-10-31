@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+<title id="title">Madar Flow — API &amp; SERVICES</title>
+<desc id="desc">Backend services connected through a central API node.</desc>
+<defs><clipPath id="frame"><rect width="1280" height="360" rx="20"/></clipPath></defs>
+<g clip-path="url(#frame)" font-family="Segoe UI, Arial, sans-serif">
+<rect width="1280" height="360" fill="#081627"/>
+<path d="M784 0 V360 M808 0 V360 M0 319 H1280" stroke="#172d43"/>
+<circle cx="1010" cy="183" r="159" fill="none" stroke="#173450"/>
+<circle cx="1010" cy="183" r="188" fill="none" stroke="#122c44" stroke-dasharray="3 10"/>
+<rect x="56" y="48" width="28" height="3" fill="#3399ff"/>
+<text x="96" y="54" fill="#a5bcd3" font-size="12" font-weight="600" letter-spacing="2.4">ORBIT MADAR / API &amp; SERVICES</text>
+<text x="56" y="148" fill="#f5f8ff" font-size="65" font-weight="700" letter-spacing="-2.5">Madar Flow<tspan fill="#3399ff">.</tspan></text>
+<text x="59" y="199" fill="#c1d3e5" font-size="26" letter-spacing="-.4">The foundation behind every flow.</text>
+<text x="59" y="274" fill="#7998b6" font-size="11" font-weight="600" letter-spacing="1.5">EXPRESS  /  TYPESCRIPT  /  MONGODB</text>
+<text x="59" y="343" fill="#6f8ba6" font-size="10" letter-spacing="2">ONE PLATFORM. THREE CONNECTED EXPERIENCES.</text>
+<text x="1224" y="54" fill="#7998b6" text-anchor="end" font-size="12" letter-spacing="2">03 / 03</text>
+<path d="M891 113 H954 Q975 113 975 137 V163 M1099 113 H1049 Q1029 113 1029 137 V163 M891 256 H953 Q975 256 975 233 V215 M1099 256 H1050 Q1029 256 1029 233 V215" fill="none" stroke="#416c95" stroke-width="2"/>
+<rect x="848" y="86" width="93" height="54" rx="10" fill="#14304b" stroke="#4a79a7"/>
+<rect x="1070" y="86" width="108" height="54" rx="10" fill="#14304b" stroke="#4a79a7"/>
+<rect x="848" y="229" width="93" height="54" rx="10" fill="#14304b" stroke="#4a79a7"/>
+<rect x="1070" y="229" width="108" height="54" rx="10" fill="#14304b" stroke="#4a79a7"/>
+<text x="894" y="119" fill="#c7d9ec" text-anchor="middle" font-size="12" letter-spacing="1">AUTH</text>
+<text x="1124" y="119" fill="#c7d9ec" text-anchor="middle" font-size="12" letter-spacing="1">DATA</text>
+<text x="894" y="262" fill="#c7d9ec" text-anchor="middle" font-size="12" letter-spacing="1">SYNC</text>
+<text x="1124" y="262" fill="#c7d9ec" text-anchor="middle" font-size="12" letter-spacing="1">EVENTS</text>
+<rect x="949" y="158" width="107" height="61" rx="12" fill="#0066cc" stroke="#73bbff" stroke-width="2"/>
+<text x="1002" y="196" fill="#fff" text-anchor="middle" font-size="22" font-weight="700" letter-spacing="2">/v1</text>
+<circle cx="975" cy="148" r="4" fill="#9ed3ff"/><circle cx="1029" cy="230" r="4" fill="#9ed3ff"/>
+</g>
+</svg>
