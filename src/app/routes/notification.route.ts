@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import {
   broadcastNotification,
+  previewBroadcast,
+  listBroadcasts,
   listNotificationsForCurrentUser,
   getNotificationForCurrentUser,
   markNotificationRead,
@@ -12,7 +14,10 @@ import { verifyAccessToken } from '../middleware/access.middleware';
 import { requireRole } from '../middleware/admin.middleware';
 import { UserRole } from '../models/user.model';
 import { validateRequestWithZod } from '../middleware/validation.middleware';
-import { broadcastNotificationSchema } from '../validations/notification.validation';
+import {
+  broadcastNotificationSchema,
+  broadcastPreviewSchema,
+} from '../validations/notification.validation';
 import { sendError } from '../shared/helper';
 import { notificationPreferencePatchSchema } from '../validations/notification-preference.validation';
 
@@ -29,6 +34,20 @@ router.post(
   requireRole(UserRole.Admin), // requireRole uses weights, so SuperAdmin is also allowed
   validateRequestWithZod(broadcastNotificationSchema),
   broadcastNotification
+);
+
+router.post(
+  '/broadcast/preview',
+  verifyAccessToken,
+  requireRole(UserRole.Admin),
+  validateRequestWithZod(broadcastPreviewSchema),
+  previewBroadcast
+);
+router.get(
+  '/broadcast/history',
+  verifyAccessToken,
+  requireRole(UserRole.Admin),
+  listBroadcasts
 );
 
 router.get('/list', verifyAccessToken, listNotificationsForCurrentUser);

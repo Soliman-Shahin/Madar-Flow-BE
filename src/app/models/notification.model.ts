@@ -1,7 +1,11 @@
 import { Document, Schema, Types, model } from 'mongoose';
 
 export type NotificationType = 'info' | 'success' | 'warn' | 'error';
-export type NotificationAudience = 'all' | 'admins' | 'moderators';
+export type NotificationAudience =
+  | 'all'
+  | 'admins'
+  | 'moderators'
+  | 'custom';
 
 export interface NotificationDocument extends Document {
   title: string;
@@ -13,6 +17,8 @@ export interface NotificationDocument extends Document {
   category?: string;
   dedupeKey?: string;
   metadata?: Record<string, unknown>;
+  targeting?: Record<string, unknown>;
+  channels?: { push: boolean; realtime: boolean };
   createdBy: Types.ObjectId;
   status: 'created' | 'dispatched' | 'partial' | 'failed';
   recipientCount: number;
@@ -37,7 +43,7 @@ const NotificationSchema = new Schema<NotificationDocument>(
     },
     audience: {
       type: String,
-      enum: ['all', 'admins', 'moderators'],
+      enum: ['all', 'admins', 'moderators', 'custom'],
       default: 'all',
     },
     routeKey: {
@@ -49,6 +55,11 @@ const NotificationSchema = new Schema<NotificationDocument>(
     category: { type: String },
     dedupeKey: { type: String },
     metadata: { type: Schema.Types.Mixed },
+    targeting: { type: Schema.Types.Mixed },
+    channels: {
+      push: { type: Boolean, default: true },
+      realtime: { type: Boolean, default: true },
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     status: {
       type: String,

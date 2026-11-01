@@ -27,6 +27,8 @@ export const broadcastNotification = async (req: Request, res: Response) => {
         message: notification.message,
         type: notification.type,
         audience: notification.audience,
+        recipientCount: notification.recipientCount,
+        status: notification.status,
         createdAt: notification.createdAt,
         isRead: false,
       },
@@ -122,4 +124,33 @@ export const updateNotificationPreferences = async (
       req.body
     ),
   });
+};
+
+export const previewBroadcast = async (req: Request, res: Response) => {
+  try {
+    return sendSuccess(
+      res,
+      await NotificationService.previewBroadcast(
+        req.body.audience,
+        req.body.target
+      )
+    );
+  } catch {
+    return sendError(res, 'Failed to preview audience', 500);
+  }
+};
+
+export const listBroadcasts = async (req: Request, res: Response) => {
+  const limit = Number(req.query.limit || 20);
+  const offset = Number(req.query.offset || 0);
+  if (
+    !Number.isInteger(limit) ||
+    limit < 1 ||
+    limit > 100 ||
+    !Number.isInteger(offset) ||
+    offset < 0
+  ) {
+    return sendError(res, 'Invalid pagination', 400, 'VALIDATION_ERROR');
+  }
+  return sendSuccess(res, await NotificationService.listBroadcasts(limit, offset));
 };
