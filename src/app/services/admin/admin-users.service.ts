@@ -118,20 +118,47 @@ export class AdminUsersService {
         .lean();
       if (!user) throw new NotFoundError('User');
 
-      const stats = await Expense.aggregate([
-        { $match: { user: user._id } },
-        {
-          $group: {
-            _id: null,
-            totalSpent: { $sum: '$amount' },
-            expenseCount: { $sum: 1 },
+      // Totals are about money the person spent: income categories and
+      // soft-deleted records are not spending, so they are split out or excluded.
+      const [byKind, deletedCount] = await Promise.all([
+        Expense.aggregate([
+          { $match: { user: user._id, _isDeleted: { $ne: true } } },
+          {
+            $lookup: {
+              from: Category.collection.name,
+              localField: 'category',
+              foreignField: '_id',
+              as: 'categoryDoc',
+            },
           },
-        },
+          {
+            $group: {
+              _id: {
+                $ifNull: [
+                  { $arrayElemAt: ['$categoryDoc.type', 0] },
+                  'outcome',
+                ],
+              },
+              total: { $sum: '$amount' },
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+        Expense.countDocuments({ user: user._id, _isDeleted: true }),
       ]);
+      const kind = (id: string) =>
+        byKind.find((row: { _id: string }) => row._id === id);
 
       return {
         ...user,
-        stats: stats[0] || { totalSpent: 0, expenseCount: 0 },
+        stats: {
+          // Spending only (outcome categories), deleted records excluded.
+          totalSpent: kind('outcome')?.total ?? 0,
+          expenseCount: kind('outcome')?.count ?? 0,
+          totalIncome: kind('income')?.total ?? 0,
+          incomeCount: kind('income')?.count ?? 0,
+          deletedCount,
+        },
       };
     } catch (error) {
       logger.error('Error fetching admin user by id:', error as Error);

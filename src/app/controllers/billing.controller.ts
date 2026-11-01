@@ -3,10 +3,15 @@ import { Request, Response, NextFunction } from 'express';
 import { sendSuccess, sendError } from '../shared/helper';
 import { AuthenticatedRequest } from '../middleware/access.middleware';
 import {
+  acceptSandboxPurchases,
   billingTestModeEnabled,
+  revenueCatAndroidPublicKey,
   revenueCatSecretKey,
   revenueCatWebhookAuth,
+  selfServiceUpgradeEnabled,
+  storePurchasesAvailable,
 } from '../config/billing.config';
+import { Plan } from '../models/plan.model';
 import { BILLING_EVENT_TYPES } from '../models/billing-event-log.model';
 import { billingService } from '../services/billing.service';
 import { revenueCatService } from '../services/revenuecat.service';
@@ -140,6 +145,42 @@ export class BillingController {
       next(error);
     }
   }
+  /**
+   * GET /v1/admin/billing/status
+   * Whether in-app purchases are wired up, for the Plans page checklist.
+   * Reports only yes/no for each switch; no secret or key value ever leaves here.
+   */
+  async status(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const plans = await Plan.find({})
+        .select('slug isActive productIds')
+        .sort({ order: 1 })
+        .lean();
+      sendSuccess(
+        res,
+        {
+          production: process.env.NODE_ENV === 'production',
+          webhookConfigured: Boolean(revenueCatWebhookAuth()),
+          androidKeyConfigured: Boolean(revenueCatAndroidPublicKey()),
+          secretKeyConfigured: Boolean(revenueCatSecretKey()),
+          storePurchasesAvailable: storePurchasesAvailable(),
+          sandboxAccepted: acceptSandboxPurchases(),
+          sandboxOverride: process.env.REVENUECAT_ACCEPT_SANDBOX === 'true',
+          testMode: billingTestModeEnabled(),
+          selfServiceUpgrade: selfServiceUpgradeEnabled(),
+          plans: plans.map((plan) => ({
+            slug: plan.slug,
+            isActive: plan.isActive,
+            productIds: plan.productIds ?? [],
+          })),
+        },
+        'Billing status'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
 }
 
 export const billingController = new BillingController();

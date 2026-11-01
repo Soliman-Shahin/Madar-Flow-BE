@@ -41,6 +41,11 @@ billingRoutes.post(
 /** POST /v1/admin/billing/test-event — rehearsal only; closed in production. */
 export const billingAdminRoutes = Router();
 billingAdminRoutes.use(verifyAccessToken, requireSuperAdmin);
+/** GET /v1/admin/billing/status — which parts of store billing are configured. */
+billingAdminRoutes.get(
+  '/status',
+  billingController.status.bind(billingController)
+);
 billingAdminRoutes.post(
   '/test-event',
   billingController.testEvent.bind(billingController)

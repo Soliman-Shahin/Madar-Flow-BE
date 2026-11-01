@@ -54,7 +54,9 @@ export class AdminCategoriesService {
 
       const [categories, total] = await Promise.all([
         Category.find(query)
-          .sort({ isDefault: -1, [sortField]: sortOrder as 1 | -1 })
+          // One predictable order: the requested field, with _id as the tie-break so
+          // equal values (and the default, newest first) never shuffle between pages.
+          .sort({ [sortField]: sortOrder as 1 | -1, _id: sortOrder as 1 | -1 })
           .skip(skip)
           .limit(limit)
           .populate('user', 'email username')
@@ -87,9 +89,10 @@ export class AdminCategoriesService {
         .lean();
       if (!category) throw new NotFoundError('Category');
 
-      // Get stats for this category across all users
+      // Get stats for this category across all users. Soft-deleted records
+      // are not part of the ledger, so they are left out of the totals.
       const stats = await Expense.aggregate([
-        { $match: { category: category._id } },
+        { $match: { category: category._id, _isDeleted: { $ne: true } } },
         {
           $group: {
             _id: null,
@@ -234,8 +237,12 @@ export class AdminCategoriesService {
    */
   async createCategory(categoryData: Partial<typeof Category>, req?: Request) {
     try {
-      const adminUser = await User.findOne({ role: UserRole.Admin });
-      if (!adminUser)
+      // The category belongs to the staff member who created it. Only when the request
+      // carries no actor (scripts, tests) do we fall back to the first admin account.
+      const ownerId =
+        req?.user_id ??
+        (await User.findOne({ role: UserRole.Admin }))?._id;
+      if (!ownerId)
         throw new Error('No admin user found to assign the category to');
 
       const data: any = { ...categoryData };
@@ -246,7 +253,7 @@ export class AdminCategoriesService {
 
       const category = new Category({
         ...data,
-        user: adminUser._id,
+        user: ownerId,
         // Not a per-user default: isDefault marks the fallback category used by deleteOne
         // reassignment and blocks deletion, so admin-created categories must stay deletable.
         isDefault: false,
