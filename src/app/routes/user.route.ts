@@ -6,6 +6,9 @@ import { GoogleOAuthExchange, User } from '../models';
 import https from 'https';
 import { sendSuccess } from '../shared/helper';
 import logger from '../utils/logger';
+import { hasStoredAvatar, resolveGoogleAvatar } from '../utils/avatar.util';
+import { createStarterCategories } from '../services/starter-categories';
+import { describeDevice } from '../utils/device.util';
 import {
   login,
   signUp,
@@ -222,12 +225,21 @@ router.get(
       .map((session: any) => ({
         id: session.sessionId,
         platform: session.platform || 'web',
+        device: session.device || null,
         createdAt: session.createdAt || null,
         lastAuthenticatedAt:
           session.lastAuthenticatedAt || session.createdAt || null,
         expiresAt: session.expiresAt,
         current: session.sessionId === auth.sessionId,
-      }));
+      }))
+      // This device first, then the most recently active.
+      .sort((a: any, b: any) => {
+        if (a.current !== b.current) return a.current ? -1 : 1;
+        return (
+          new Date(b.lastAuthenticatedAt || 0).getTime() -
+          new Date(a.lastAuthenticatedAt || 0).getTime()
+        );
+      });
     return res.json({ success: true, data: { sessions } });
   }
 );
@@ -306,7 +318,12 @@ router.post(
     }
 
     const { refreshToken, accessToken } =
-      await UserService.createAuthenticatedSession(user, 'google_web');
+      await UserService.createAuthenticatedSession(
+        user,
+        'google_web',
+        'web',
+        describeDevice(req)
+      );
     const { password, sessions, image, ...userWithoutSecrets } = user.toJSON();
     const safeUser = {
       ...userWithoutSecrets,
@@ -447,11 +464,12 @@ router.post('/auth/google/native', async (req: Request, res: Response) => {
         socialId: sub,
         email,
         username: name,
-        image: picture,
+        image: await resolveGoogleAvatar(picture),
         emailVerified,
         ...consentFields(),
       });
       await (user as any).save();
+      await createStarterCategories((user as any)._id);
     } else {
       // Update profile data if changed
       let mutated = false;
@@ -459,12 +477,15 @@ router.post('/auth/google/native', async (req: Request, res: Response) => {
         (user as any).socialId = sub;
         mutated = true;
       }
-      if (name && user.username !== name) {
+      // Google only FILLS what is missing. The user may have renamed
+      // themselves or uploaded their own photo in the app; signing in again
+      // must never put Google's version back.
+      if (name && !user.username) {
         (user as any).username = name;
         mutated = true;
       }
-      if (picture && user.image !== picture) {
-        (user as any).image = picture;
+      if (picture && !hasStoredAvatar(user.image)) {
+        (user as any).image = await resolveGoogleAvatar(picture);
         mutated = true;
       }
       if (emailVerified !== undefined && user.emailVerified !== emailVerified) {
@@ -482,7 +503,8 @@ router.post('/auth/google/native', async (req: Request, res: Response) => {
       await UserService.createAuthenticatedSession(
         user,
         'google_native',
-        platform
+        platform,
+        describeDevice(req)
       );
 
     const rawUser = (user as any).toJSON ? (user as any).toJSON() : user;
@@ -581,6 +603,7 @@ router.get(
         const profile = user.pendingGoogleProfile;
         const created = new User({ ...profile, ...consentFields() });
         await created.save();
+        await createStarterCategories(created._id);
         user = created;
         (req as any).user = user;
         res.clearCookie('ew_google_consent');

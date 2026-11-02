@@ -82,7 +82,7 @@ export const biometricSignIn = async (
       return sendError(res, failure, 401, 'BIOMETRIC_AUTH_FAILED');
     }
     await audit(req, AuditAction.BIOMETRIC_SIGNIN, user._id.toString());
-    return sendUserAndTokens(res, user);
+    return sendUserAndTokens(res, user, 'biometric', req);
   } catch {
     await audit(req, AuditAction.BIOMETRIC_SIGNIN_FAILED, undefined, false);
     return sendError(res, failure, 401, 'BIOMETRIC_AUTH_FAILED');

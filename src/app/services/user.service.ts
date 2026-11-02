@@ -8,6 +8,7 @@ import { NotificationService } from './notification.service';
 import logger from './logger.service';
 import { QueryFilter } from 'mongoose';
 import { normalizeEmail } from '../shared/email';
+import { Plan } from '../models/plan.model';
 config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET!;
@@ -34,10 +35,16 @@ export class UserService {
       | 'google_web'
       | 'google_native'
       | 'biometric',
-    platform: 'web' | 'android' | 'ios' = 'web'
+    platform: 'web' | 'android' | 'ios' = 'web',
+    device?: string
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const refreshToken = await this.generateRefreshToken();
-    const sessionId = await this.addRefreshToken(user, refreshToken, platform);
+    const sessionId = await this.addRefreshToken(
+      user,
+      refreshToken,
+      platform,
+      device
+    );
     const accessToken = await this.generateAccessToken(user, sessionId);
     const occurredAt = new Date().toISOString();
 
@@ -132,7 +139,8 @@ export class UserService {
   static async addRefreshToken(
     user: UserDocument,
     refreshToken: string,
-    platform: 'web' | 'android' | 'ios' = 'web'
+    platform: 'web' | 'android' | 'ios' = 'web',
+    device?: string
   ): Promise<string> {
     const hashed = hashToken(refreshToken);
     const sessionId = this.generateSessionId();
@@ -159,12 +167,77 @@ export class UserService {
             createdAt: new Date(),
             lastAuthenticatedAt: new Date(),
             platform,
+            ...(device ? { device } : {}),
           },
         },
       }
     );
     if (!result.matchedCount) throw new Error('Account unavailable');
+    await this.enforceDeviceLimit(user, sessionId);
     return sessionId;
+  }
+
+  /**
+   * The plan's "devices" number is how many sessions may be signed in at once.
+   * Signing in is never refused: when a new session pushes the account over
+   * the limit, the least recently active older sessions are ended instead, so
+   * the device the person is holding right now always works.
+   */
+  static async enforceDeviceLimit(
+    user: UserDocument,
+    keepSessionId: string
+  ): Promise<void> {
+    try {
+      const plan = await Plan.findOne({ slug: user.plan })
+        .select('limits.maxDevices')
+        .lean();
+      const max = (plan as any)?.limits?.maxDevices;
+      if (typeof max !== 'number' || max < 1) return; // unlimited / not set
+
+      const now = Math.floor(Date.now() / 1000);
+      const fresh = await User.findById(user._id).select('sessions').lean();
+      const active = (fresh?.sessions || []).filter(
+        (s: any) => s.expiresAt > now
+      );
+      if (active.length <= max) return;
+
+      const when = (s: any) =>
+        new Date(s.lastAuthenticatedAt || s.createdAt || 0).getTime();
+      const ended = active
+        .filter((s: any) => s.sessionId !== keepSessionId)
+        .sort((a: any, b: any) => when(a) - when(b))
+        .slice(0, active.length - max);
+      const surplus = ended.map((s: any) => s.sessionId);
+      if (!surplus.length) return;
+
+      await User.updateOne(
+        { _id: user._id },
+        { $pull: { sessions: { sessionId: { $in: surplus } } } }
+      );
+      logger.info('Ended older sessions over the plan device limit', {
+        userId: user._id.toString(),
+        ended: surplus.length,
+        max,
+      });
+
+      // Tell the person, in the inbox, why a device was signed out.
+      const labels = ended.map(
+        (s: any) => s.device || (s.platform === 'web' ? 'Web browser' : s.platform === 'ios' ? 'iPhone or iPad' : 'Android device')
+      );
+      await NotificationService.dispatchUserEvent({
+        userId: user._id.toString(),
+        event: 'security.session_limit',
+        dedupeKey: `security.session_limit:${keepSessionId}`,
+        title: 'Signed out on another device',
+        message: `${labels.join(', ')} was signed out because your plan allows ${max} device${max === 1 ? '' : 's'} at a time.`,
+        metadata: { endedDevices: labels, maxDevices: max },
+      });
+    } catch (error: unknown) {
+      // Never let the limit check break a sign-in.
+      logger.warn('Device limit check failed', {
+        error: errorMessage(error) || 'unknown error',
+      });
+    }
   }
 
   // Remove a refresh token (on logout or rotation)

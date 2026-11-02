@@ -219,6 +219,8 @@ const UserSchema = new Schema<UserDocument>(
           enum: ['web', 'android', 'ios'],
           default: 'web',
         },
+        // Short label such as "Chrome on Windows", for the Active sessions screen
+        device: { type: String, maxlength: 60 },
       },
     ],
     passwordResetTokenHash: { type: String, select: false },

@@ -331,6 +331,9 @@ export class PlanService {
     return Category.countDocuments({
       user: userId,
       _isDeleted: { $ne: true },
+      // Categories created for the user at signup do not use up their quota.
+      isStarter: { $ne: true },
+      isDefault: { $ne: true },
     });
   }
 
@@ -553,6 +556,21 @@ export class PlanService {
       if (!exists) {
         await Plan.create(planData);
         logger.info(`Seeded plan: ${planData.slug}`);
+        continue;
+      }
+      // An older plan document can predate permissions the app now needs, which
+      // leaves every user on it with 403s. Add what is missing; never remove
+      // or change anything an admin set (price, limits, extra features).
+      const have = new Set<string>(exists.features ?? []);
+      const missing = planData.features.filter((f) => !have.has(f));
+      if (missing.length > 0) {
+        await Plan.updateOne(
+          { slug: planData.slug },
+          { $addToSet: { features: { $each: missing } } }
+        );
+        logger.info(
+          `Added ${missing.length} missing permission(s) to plan: ${planData.slug}`
+        );
       }
     }
   }

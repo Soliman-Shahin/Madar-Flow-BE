@@ -4,6 +4,7 @@ import { User } from '../models';
 import { UserService } from '../services/user.service';
 import dotenv from 'dotenv';
 import logger from '../utils/logger';
+import { hasStoredAvatar, resolveGoogleAvatar } from '../utils/avatar.util';
 
 // Initialize dotenv to use environment variables
 dotenv.config();
@@ -29,8 +30,8 @@ passport.use(
             existingBySocial.username = profile.displayName;
             updated = true;
           }
-          if (!existingBySocial.image && photo) {
-            existingBySocial.image = photo;
+          if (!hasStoredAvatar(existingBySocial.image) && photo) {
+            existingBySocial.image = await resolveGoogleAvatar(photo);
             updated = true;
           }
           if (updated) await existingBySocial.save();
@@ -55,7 +56,8 @@ passport.use(
               (profile.photos && profile.photos[0]?.value) || undefined;
             if (!existingByEmail.username && profile.displayName)
               existingByEmail.username = profile.displayName;
-            if (!existingByEmail.image && photo) existingByEmail.image = photo;
+            if (!hasStoredAvatar(existingByEmail.image) && photo)
+              existingByEmail.image = await resolveGoogleAvatar(photo);
             await existingByEmail.save();
             return done(null, existingByEmail);
           }

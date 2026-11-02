@@ -349,6 +349,44 @@ describe('AUTH.1 session contract', () => {
     ).not.toBeNull();
     expect(await UserService.rotateRefreshToken(other.refreshToken)).toBeNull();
   });
+  it('lists this device first, then the most recently active, with a device label', async () => {
+    const user = await account();
+    const oldest = await UserService.createAuthenticatedSession(
+      user,
+      'password',
+      'web',
+      'Firefox on Linux'
+    );
+    const newest = await UserService.createAuthenticatedSession(
+      user,
+      'password',
+      'android',
+      'Pixel 7 · Chrome'
+    );
+    const current = await UserService.createAuthenticatedSession(
+      user,
+      'password',
+      'ios',
+      'Safari on iOS'
+    );
+    // Make the order of activity unambiguous: oldest < newest.
+    await User.updateOne(
+      { _id: user._id, 'sessions.device': 'Firefox on Linux' },
+      { $set: { 'sessions.$.lastAuthenticatedAt': new Date(Date.now() - 60000) } }
+    );
+    void oldest;
+    void newest;
+    const listed = await request(app)
+      .get('/v1/user/sessions')
+      .set('Authorization', `Bearer ${current.accessToken}`);
+    const rows = listed.body.data.sessions;
+    expect(rows.map((r: any) => r.device)).toEqual([
+      'Safari on iOS',
+      'Pixel 7 · Chrome',
+      'Firefox on Linux',
+    ]);
+    expect(rows[0].current).toBe(true);
+  });
   it('does not let a session-management endpoint revoke the current session accidentally', async () => {
     const user = await account();
     const current = await UserService.createAuthenticatedSession(

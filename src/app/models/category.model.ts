@@ -13,6 +13,8 @@ export interface ICategory extends Document {
   order: number;
   user: Types.ObjectId;
   isDefault: boolean;
+  /** Created automatically at signup; never counts toward the plan limit. */
+  isStarter?: boolean;
   isActive: boolean;
   // Sync fields
   _syncStatus?: 'synced' | 'pending' | 'conflict' | 'error' | 'offline';
@@ -40,6 +42,7 @@ const categorySchema = new Schema(
     order: { type: Number, default: 0 },
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     isDefault: { type: Boolean, default: false },
+    isStarter: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     // Sync fields
     _syncStatus: {

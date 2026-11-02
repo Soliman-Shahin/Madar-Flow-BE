@@ -7,7 +7,9 @@ import {
   setRefreshCookie,
   usesHttpOnlyRefreshCookie,
 } from '../services/refresh-cookie.service';
-import { User, Category } from '../models';
+import { User } from '../models';
+import { createStarterCategories } from '../services/starter-categories';
+import { describeDevice } from '../utils/device.util';
 import bcrypt from 'bcryptjs';
 import { validatePassword } from '../services/password-validation.service';
 
@@ -65,6 +67,8 @@ const requestPlatform = (req: CustomRequest): 'web' | 'android' | 'ios' => {
 const signUp = async (req: CustomRequest, res: Response) => {
   try {
     const { email, password } = req.body as UserCredentials;
+    const username =
+      typeof req.body?.username === 'string' ? req.body.username.trim() : '';
     assertNewAccountConsent(req.body);
 
     // Validate password strength
@@ -89,28 +93,22 @@ const signUp = async (req: CustomRequest, res: Response) => {
     const user = await UserService.createUser(
       email,
       hashedPassword,
-      consentFields()
+      { ...consentFields(), ...(username ? { username } : {}) }
     );
 
     // Log user creation
     logger.info('New user registered', { userId: user._id.toString(), email });
 
-    // Create a default category for the new user
-    await Category.create({
-      title: 'Uncategorized',
-      icon: 'help-circle-outline',
-      color: '#9E9E9E',
-      type: 'outcome',
-      user: user._id,
-      isDefault: true,
-    });
+    // Uncategorized (fallback) + Income, so the account is usable at once
+    await createStarterCategories(user._id);
 
     // Generate tokens
     const refreshToken = await UserService.generateRefreshToken();
     const sessionId = await UserService.addRefreshToken(
       user,
       refreshToken,
-      requestPlatform(req)
+      requestPlatform(req),
+      describeDevice(req)
     );
     const accessToken = await UserService.generateAccessToken(user, sessionId);
 
@@ -174,7 +172,8 @@ const login = async (req: CustomRequest, res: Response) => {
       await UserService.createAuthenticatedSession(
         user,
         'password',
-        requestPlatform(req)
+        requestPlatform(req),
+        describeDevice(req)
       );
 
     const cookieAuth = usesHttpOnlyRefreshCookie(req);

@@ -14,6 +14,7 @@ export const NOTIFICATION_EVENTS = [
   'sync.repeated_failure',
   'subscription.expiring',
   'security.new_login',
+  'security.session_limit',
   'general.admin_broadcast',
 ] as const;
 export type NotificationEvent = (typeof NOTIFICATION_EVENTS)[number];
@@ -28,6 +29,7 @@ export const NOTIFICATION_EVENT_DEFINITIONS: Record<
   'sync.repeated_failure': { category: 'sync', policy: 'optional' },
   'subscription.expiring': { category: 'subscription', policy: 'optional' },
   'security.new_login': { category: 'security', policy: 'mandatory' },
+  'security.session_limit': { category: 'security', policy: 'mandatory' },
   'general.admin_broadcast': { category: 'general', policy: 'mandatory' },
 };
 

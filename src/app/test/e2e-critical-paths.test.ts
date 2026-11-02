@@ -387,9 +387,16 @@ describe('E2E: plan limits', () => {
       }
     }
     expect(blocked).toBe(403);
+    // The limit applies to the user's own categories; the two starter ones
+    // (Uncategorized, Income) are extra and never counted.
     expect(
-      await Category.countDocuments({ user: id, _isDeleted: { $ne: true } })
+      await Category.countDocuments({
+        user: id,
+        _isDeleted: { $ne: true },
+        isStarter: { $ne: true },
+      })
     ).toBe(max);
+    expect(await Category.countDocuments({ user: id, isStarter: true })).toBe(2);
   });
   it('reports real usage and stops a free account at its monthly transaction limit', async () => {
     const { token, id } = await signUp('tx-limit@example.test');
@@ -417,7 +424,8 @@ describe('E2E: plan limits', () => {
     const usage = (await get('/v1/plans/me', token)).body.data.usage;
     expect(usage.transactionsThisMonth.used).toBe(max);
     expect(usage.transactionsThisMonth.percentage).toBe(100);
-    expect(usage.categories.used).toBe(1);
+    // Starter categories (Uncategorized, Income) do not use up the quota.
+    expect(usage.categories.used).toBe(0);
   });
 });
 
