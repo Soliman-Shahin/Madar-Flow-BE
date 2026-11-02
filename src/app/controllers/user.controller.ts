@@ -90,11 +90,10 @@ const signUp = async (req: CustomRequest, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
     // Create user
-    const user = await UserService.createUser(
-      email,
-      hashedPassword,
-      { ...consentFields(), ...(username ? { username } : {}) }
-    );
+    const user = await UserService.createUser(email, hashedPassword, {
+      ...consentFields(),
+      ...(username ? { username } : {}),
+    });
 
     // Log user creation
     logger.info('New user registered', { userId: user._id.toString(), email });
@@ -489,6 +488,52 @@ const updateMe = async (
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         (updatePayload as any)[key] = req.body[key];
+      }
+    }
+
+    // Server-side validation: never trust the client forms.
+    const bad = (msg: string) => sendError(res, msg, 400, 'VALIDATION_ERROR');
+    const up = updatePayload as Record<string, unknown>;
+    if (up.username !== undefined) {
+      const name = typeof up.username === 'string' ? up.username.trim() : '';
+      if (name.length < 2 || name.length > 50) {
+        return bad('Name must be between 2 and 50 characters');
+      }
+      up.username = name;
+    }
+    if (up.phone !== undefined && up.phone !== null && up.phone !== '') {
+      const phone = typeof up.phone === 'string' ? up.phone.trim() : '';
+      if (!/^\+?[0-9\s\-()]{6,20}$/.test(phone)) {
+        return bad('Please enter a valid phone number');
+      }
+      up.phone = phone;
+    }
+    if (
+      up.currency !== undefined &&
+      up.currency !== null &&
+      up.currency !== ''
+    ) {
+      const currency =
+        typeof up.currency === 'string' ? up.currency.trim().toUpperCase() : '';
+      if (!/^[A-Z]{3}$/.test(currency)) return bad('Invalid currency code');
+      up.currency = currency;
+    }
+    if (up.salary !== undefined) {
+      const rows = up.salary;
+      if (!Array.isArray(rows) || rows.length > 20) {
+        return bad('Invalid salary details');
+      }
+      for (const row of rows as Array<{ label?: unknown; amount?: unknown }>) {
+        if (
+          typeof row?.label !== 'string' ||
+          !row.label.trim() ||
+          row.label.length > 50 ||
+          typeof row.amount !== 'number' ||
+          !Number.isFinite(row.amount) ||
+          row.amount < 0
+        ) {
+          return bad('Invalid salary details');
+        }
       }
     }
 

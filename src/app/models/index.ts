@@ -14,3 +14,4 @@ export * from './biometric-credential.model';
 export * from './google-oauth-exchange.model';
 export * from './notification-preference.model';
 export * from './analytics-report-schedule.model';
+export * from './receipt-scan-usage.model';

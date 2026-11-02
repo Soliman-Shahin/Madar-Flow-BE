@@ -51,6 +51,11 @@ export interface PlanLimits {
   maxBackupFiles: number | null;
   /** Maximum number of concurrent logged-in devices */
   maxDevices: number | null;
+  /**
+   * Online receipt scans per calendar month (null = unlimited). Optional so
+   * plans saved before the setting existed keep working with a safe default.
+   */
+  maxReceiptScansPerMonth?: number | null;
 }
 
 // ==================== Plan Limit Check ====================

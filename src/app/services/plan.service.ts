@@ -55,6 +55,7 @@ export const DEFAULT_PLANS: PlanData[] = [
       maxTransactionsPerMonth: 50,
       maxBackupFiles: 0,
       maxDevices: 1,
+      maxReceiptScansPerMonth: 10,
     },
     features: [
       Permission.CATEGORY_CREATE,
@@ -87,6 +88,7 @@ export const DEFAULT_PLANS: PlanData[] = [
       maxTransactionsPerMonth: 500,
       maxBackupFiles: 10,
       maxDevices: 3,
+      maxReceiptScansPerMonth: 100,
     },
     features: [
       Permission.CATEGORY_CREATE,
@@ -125,6 +127,7 @@ export const DEFAULT_PLANS: PlanData[] = [
       maxTransactionsPerMonth: null,
       maxBackupFiles: null,
       maxDevices: null,
+      maxReceiptScansPerMonth: null,
     },
     features: [
       Permission.CATEGORY_CREATE,
@@ -557,6 +560,23 @@ export class PlanService {
         await Plan.create(planData);
         logger.info(`Seeded plan: ${planData.slug}`);
         continue;
+      }
+      // A plan saved before receipt scanning existed gets its default allowance
+      // once. Only when the field is missing: an admin's value (even null for
+      // unlimited) is never touched.
+      if (planData.limits.maxReceiptScansPerMonth !== undefined) {
+        await Plan.updateOne(
+          {
+            slug: planData.slug,
+            'limits.maxReceiptScansPerMonth': { $exists: false },
+          },
+          {
+            $set: {
+              'limits.maxReceiptScansPerMonth':
+                planData.limits.maxReceiptScansPerMonth,
+            },
+          }
+        );
       }
       // An older plan document can predate permissions the app now needs, which
       // leaves every user on it with 403s. Add what is missing; never remove
