@@ -56,6 +56,8 @@ export interface PlanLimits {
    * plans saved before the setting existed keep working with a safe default.
    */
   maxReceiptScansPerMonth?: number | null;
+  /** Vault items a person can keep (null = unlimited). */
+  maxAssets?: number | null;
 }
 
 // ==================== Plan Limit Check ====================

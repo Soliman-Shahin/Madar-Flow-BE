@@ -91,6 +91,7 @@ const PlanSchema = new Schema<IPlan>(
       maxDevices: { type: Number, default: null },
       // No default: a plan saved before this setting falls back to a safe value.
       maxReceiptScansPerMonth: { type: Number, default: undefined },
+      maxAssets: { type: Number, default: undefined },
     },
     features: {
       type: [String],

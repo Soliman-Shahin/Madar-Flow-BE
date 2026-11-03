@@ -56,6 +56,7 @@ export const DEFAULT_PLANS: PlanData[] = [
       maxBackupFiles: 0,
       maxDevices: 1,
       maxReceiptScansPerMonth: 10,
+      maxAssets: 10,
     },
     features: [
       Permission.CATEGORY_CREATE,
@@ -89,6 +90,7 @@ export const DEFAULT_PLANS: PlanData[] = [
       maxBackupFiles: 10,
       maxDevices: 3,
       maxReceiptScansPerMonth: 100,
+      maxAssets: 100,
     },
     features: [
       Permission.CATEGORY_CREATE,
@@ -128,6 +130,7 @@ export const DEFAULT_PLANS: PlanData[] = [
       maxBackupFiles: null,
       maxDevices: null,
       maxReceiptScansPerMonth: null,
+      maxAssets: null,
     },
     features: [
       Permission.CATEGORY_CREATE,
@@ -576,6 +579,12 @@ export class PlanService {
                 planData.limits.maxReceiptScansPerMonth,
             },
           }
+        );
+      }
+      if (planData.limits.maxAssets !== undefined) {
+        await Plan.updateOne(
+          { slug: planData.slug, 'limits.maxAssets': { $exists: false } },
+          { $set: { 'limits.maxAssets': planData.limits.maxAssets } }
         );
       }
       // An older plan document can predate permissions the app now needs, which
