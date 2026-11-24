@@ -5,11 +5,13 @@
  * Enabled only when SENTRY_DSN is set (production/staging); local runs and tests send nothing.
  * Errors only: no tracing, no profiling, no session data.
  *
- * Privacy: this is a finance app. Request bodies, cookies, auth headers, query strings and
- * user identity are stripped before anything leaves the server.
+ * Privacy: this is a finance app. Request bodies, cookies, auth headers, query strings, user
+ * identity, breadcrumbs and extra data are never sent, and exception text is scrubbed of
+ * e-mails, tokens and quoted values (see shared/sentry-scrub.ts).
  */
 import { config } from 'dotenv';
 import * as Sentry from '@sentry/node';
+import { scrubEvent } from './shared/sentry-scrub';
 
 config();
 
@@ -38,21 +40,12 @@ if (dsn) {
       const status = Number(original?.statusCode ?? original?.status);
       if (Number.isFinite(status) && status >= 400 && status < 500) return null;
 
-      if (event.request) {
-        delete event.request.data;
-        delete event.request.cookies;
-        delete event.request.headers;
-        delete event.request.query_string;
-      }
-      delete event.user;
-      return event;
+      // Exception messages are free text (they can quote e-mails, tokens, submitted values):
+      // redact them and drop breadcrumbs/extra/user/request data.
+      return scrubEvent(event);
     },
-    beforeBreadcrumb(breadcrumb) {
-      // HTTP breadcrumbs can carry URLs with tokens/ids; keep the category only.
-      if (breadcrumb.category === 'http' || breadcrumb.category === 'fetch') {
-        return { ...breadcrumb, data: undefined };
-      }
-      return breadcrumb;
-    },
+    // Our logger writes to the console, and console output would become breadcrumbs: keep none.
+    maxBreadcrumbs: 0,
+    beforeBreadcrumb: () => null,
   });
 }
