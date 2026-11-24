@@ -6,6 +6,7 @@ import {
   submitDeletionConfirm,
   submitDeletionRequest,
 } from '../controllers/account-deletion-page.controller';
+import { showResetPasswordPage } from '../controllers/account-reset-page.controller';
 
 /**
  * Public account pages served as plain HTML outside /v1. Mounted before the
@@ -28,6 +29,9 @@ const confirmLimiter = createRateLimiter({
 });
 
 router.use(express.urlencoded({ extended: false, limit: '4kb' }));
+
+// Landing page linked from the password-reset e-mail (https; opens the app via its deep link).
+router.get('/reset-password', showResetPasswordPage);
 
 router.get('/delete', showDeletionRequestPage);
 router.post('/delete', requestLimiter, submitDeletionRequest);
