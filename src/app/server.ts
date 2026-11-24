@@ -1,3 +1,4 @@
+import './instrument'; // must stay first: initialises Sentry before other modules load
 import logger from './services/logger.service';
 import { config } from 'dotenv';
 import { connectToDB } from './db';
