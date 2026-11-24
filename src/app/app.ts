@@ -119,6 +119,8 @@ function configureExpressApp(): express.Application {
     res.status(404).json({ success: false, message: 'Endpoint not found' });
   });
 
+  // Sentry's expressIntegration (initialised in instrument.ts) reports errors passed to
+  // next(err) automatically, so no extra middleware is needed here.
   app.use(enhancedErrorHandler);
 
   return app;
