@@ -20,6 +20,8 @@ export class MailService {
       },
       body: JSON.stringify({
         from,
+        // The sender address has no inbox: replies go to the support mailbox.
+        reply_to: BRAND.supportEmail,
         to: [email],
         subject: report.subject,
         html: report.html,
@@ -48,6 +50,8 @@ export class MailService {
       },
       body: JSON.stringify({
         from,
+        // The sender address has no inbox: replies go to the support mailbox.
+        reply_to: BRAND.supportEmail,
         to: [email],
         subject: `Reset your ${BRAND.productName} password`,
         html: `<p><strong>${BRAND.productName}</strong></p><p>We received a request to reset your password.</p><p><a href="${url.toString()}">Reset your password</a></p><p>This link expires in 20 minutes. If you did not request this, you can safely ignore this email.</p>`,
@@ -80,6 +84,8 @@ export class MailService {
       },
       body: JSON.stringify({
         from,
+        // The sender address has no inbox: replies go to the support mailbox.
+        reply_to: BRAND.supportEmail,
         to: [email],
         subject: `Confirm ${BRAND.productName} account deletion`,
         html: `<p><strong>${BRAND.productName}</strong></p><p>We received a request to permanently delete your account and all of its data.</p><p><a href="${link}">Review and confirm account deletion</a></p><p>This link expires in 30 minutes. If you did not request this, ignore this email and your account will stay active.</p><hr><p dir="rtl">وصلنا طلب لحذف حسابك وكل بياناته نهائيًا. <a href="${link}">راجع وأكّد حذف الحساب</a>. تنتهي صلاحية الرابط خلال 30 دقيقة. إذا لم تطلب ذلك، تجاهل هذه الرسالة وسيظل حسابك نشطًا.</p>`,
