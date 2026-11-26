@@ -590,11 +590,20 @@ export class SyncService {
       if (already) return;
     }
 
-    const context = await permissionCacheService.getUserPlanContext(userId);
-    if (limitType === 'categories') {
-      await planService.checkCategoryLimit(userId, context);
-    } else {
-      await planService.checkTransactionLimit(userId, context);
+    try {
+      const context = await permissionCacheService.getUserPlanContext(userId);
+      if (limitType === 'categories') {
+        await planService.checkCategoryLimit(userId, context);
+      } else {
+        await planService.checkTransactionLimit(userId, context);
+      }
+    } catch (error: unknown) {
+      // Only a real limit refusal stops the record. If the plan cannot be
+      // loaded, user data must still sync (the REST routes keep enforcing).
+      if (errorCode(error) === 'PLAN_LIMIT_EXCEEDED') throw error;
+      logger.warn(
+        `[SYNC] Plan limit check skipped for user ${userId}: ${errorMessage(error)}`
+      );
     }
   }
 
