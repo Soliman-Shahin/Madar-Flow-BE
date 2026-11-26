@@ -396,7 +396,9 @@ describe('E2E: plan limits', () => {
         isStarter: { $ne: true },
       })
     ).toBe(max);
-    expect(await Category.countDocuments({ user: id, isStarter: true })).toBe(2);
+    expect(await Category.countDocuments({ user: id, isStarter: true })).toBe(
+      2
+    );
   });
   it('reports real usage and stops a free account at its monthly transaction limit', async () => {
     const { token, id } = await signUp('tx-limit@example.test');
@@ -426,6 +428,75 @@ describe('E2E: plan limits', () => {
     expect(usage.transactionsThisMonth.percentage).toBe(100);
     // Starter categories (Uncategorized, Income) do not use up the quota.
     expect(usage.categories.used).toBe(0);
+  });
+  it('enforces the category limit on sync pushes and reports the overflow in errors', async () => {
+    const { token, id } = await signUp('sync-cat-limit@example.test');
+    const max = (await get('/v1/plans/me', token)).body.data.context.limits
+      .maxCategories as number;
+    const entities = Array.from({ length: max + 2 }, (_, i) => ({
+      _id: `offline_cat_limit_${i}`,
+      _clientId: `offline_cat_limit_${i}`,
+      _entityType: 'category',
+      _operationId: `op-cat-${i}`,
+      title: `Cat ${i}`,
+      icon: 'tag-outline',
+      color: '#3366ff',
+      type: 'outcome',
+      order: i,
+    }));
+    const push = await post('/v1/sync/push', token, { entities });
+    expect(push.status).toBe(200);
+    expect(push.body.data.processed).toBe(max);
+    expect(push.body.data.errors).toHaveLength(2);
+    expect(push.body.data.errors[0].reason).toMatch(/Plan limit reached/);
+    expect(
+      await Category.countDocuments({
+        user: id,
+        _isDeleted: { $ne: true },
+        isStarter: { $ne: true },
+      })
+    ).toBe(max);
+  });
+  it('enforces the monthly transaction limit on sync pushes without blocking edits', async () => {
+    const { token, id } = await signUp('sync-tx-limit@example.test');
+    const max = (await get('/v1/plans/me', token)).body.data.context.limits
+      .maxTransactionsPerMonth as number;
+    const categoryId = (await Category.findOne({ user: id }))!._id.toString();
+    const expense = (i: number) => ({
+      _id: `offline_tx_limit_${i}`,
+      _clientId: `offline_tx_limit_${i}`,
+      _entityType: 'expense',
+      _operationId: `op-tx-${i}`,
+      description: `Item ${i}`,
+      amount: 1,
+      category: categoryId,
+      date: new Date().toISOString(),
+    });
+    const push = await post('/v1/sync/push', token, {
+      entities: Array.from({ length: max + 2 }, (_, i) => expense(i)),
+    });
+    expect(push.body.data.processed).toBe(max);
+    expect(push.body.data.errors).toHaveLength(2);
+    expect(await Expense.countDocuments({ user: id })).toBe(max);
+
+    // Editing an existing row at the limit is still allowed.
+    const created = await Expense.findOne({ user: id }).lean();
+    const edit = await post('/v1/sync/push', token, {
+      entities: [
+        {
+          _id: String(created!._id),
+          _entityType: 'expense',
+          _operationId: 'op-tx-edit',
+          _baseVersion: created!._version,
+          description: 'Edited',
+          amount: 2,
+          category: categoryId,
+          date: new Date().toISOString(),
+        },
+      ],
+    });
+    expect(edit.body.data.errors).toHaveLength(0);
+    expect(edit.body.data.processed).toBe(1);
   });
 });
 
