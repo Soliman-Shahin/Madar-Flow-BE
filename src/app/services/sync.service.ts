@@ -13,6 +13,8 @@ import {
   SyncMetadata,
 } from '../models/sync.model';
 import mongoose from 'mongoose';
+import { planService } from './plan.service';
+import { permissionCacheService } from './permission-cache.service';
 import { CategoryService } from './category.service';
 import { NotificationService } from './notification.service';
 import { SyncFailure } from '../models/sync-failure.model';
@@ -303,6 +305,9 @@ export class SyncService {
           errors.push({
             operationId: entity._operationId,
             reason: errorMessage(error) || 'SYNC_PROCESSING_FAILED',
+            ...(errorCode(error) === 'PLAN_LIMIT_EXCEEDED' && {
+              code: 'PLAN_LIMIT_EXCEEDED',
+            }),
           });
         }
       }
@@ -526,6 +531,9 @@ export class SyncService {
         }
         logger.info(`✏️ [SYNC] Updated ${_entityType}:${targetId}`);
       } else {
+        // Same plan limits as the REST create routes. Only brand-new rows are
+        // checked: updates/deletes and idempotent retries never consume quota.
+        await this.enforcePlanLimit(Model, userId, entityData);
         await this.handleCreate(
           Model,
           entityData,
@@ -549,6 +557,44 @@ export class SyncService {
         asError(error)
       );
       throw error;
+    }
+  }
+
+  /**
+   * Enforce plan limits for a create arriving through sync. Throws
+   * PlanLimitError (code PLAN_LIMIT_EXCEEDED); pushData reports it in `errors`.
+   */
+  private async enforcePlanLimit(
+    Model: any,
+    userId: string,
+    entityData: any
+  ): Promise<void> {
+    const limitType =
+      Model === Category
+        ? 'categories'
+        : Model === Expense
+          ? 'transactions'
+          : null;
+    if (!limitType) return;
+
+    // A retry of an already-created row must not be rejected by its own quota.
+    const clientId =
+      typeof entityData._clientId === 'string'
+        ? entityData._clientId
+        : undefined;
+    if (clientId) {
+      const already = await Model.exists({
+        user: new mongoose.Types.ObjectId(userId),
+        _clientId: clientId,
+      });
+      if (already) return;
+    }
+
+    const context = await permissionCacheService.getUserPlanContext(userId);
+    if (limitType === 'categories') {
+      await planService.checkCategoryLimit(userId, context);
+    } else {
+      await planService.checkTransactionLimit(userId, context);
     }
   }
 
